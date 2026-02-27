@@ -5,7 +5,7 @@ from spec.taskspec import TaskSpec, Clause
 from spec.compiler import Compiler
 
 # ---- Logic ----
-from logic.predicates import at_goal_pose, human_comfort_distance
+from logic.predicates import at_goal_pose, human_comfort_distance, velocity_limit
 
 # ---- Core ----
 from core.certified_policy import CertifiedPolicy
@@ -23,42 +23,9 @@ from spec.json_parser import load_taskspec_from_json
 def build_predicate_registry():
     return {
         "AtGoalPose": at_goal_pose,
-        "HumanComfortDistance": human_comfort_distance
+        "HumanComfortDistance": human_comfort_distance,
+        "VelocityLimit": velocity_limit
     }
-
-
-# # ----------------------------
-# # TaskSpec Builder
-# # ----------------------------
-# def build_taskspec(goal_pose, human_position):
-
-#     clauses = [
-#         Clause(
-#             operator="eventually",
-#             predicate="AtGoalPose",
-#             weight=5.0,
-#             modality="REQUIRE",
-#             parameters={
-#                 "target": goal_pose,
-#                 "tolerance": 0.05
-#             }
-#         ),
-#         Clause(
-#             operator="always",
-#             predicate="HumanComfortDistance",
-#             weight=3.0,
-#             modality="PREFER",
-#             parameters={
-#                 "human_position": human_position,
-#                 "preferred_distance": 0.15  # realistic in this workspace
-#             }
-#         )
-#     ]
-
-#     return TaskSpec(
-#         horizon_sec=5.0,
-#         clauses=clauses
-#     )
 
 
 # ----------------------------
@@ -78,7 +45,7 @@ def main():
     compiler = Compiler(predicate_registry)
     objective_fn = compiler.compile(taskspec)
 
-    certified_policy = CertifiedPolicy()
+    certified_policy = CertifiedPolicy(taskspec.horizon_sec)
 
     theta_dim = certified_policy.parameter_dimension()
 
@@ -166,6 +133,30 @@ def main():
 
     trace_nominal = certified_policy.rollout(np.zeros(theta_dim))
     trace_learned = certified_policy.rollout(current_mean)
+
+    speed = np.linalg.norm(trace_learned.velocity, axis=1)
+
+    plt.figure()
+    plt.plot(trace_learned.time, speed)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Speed magnitude")
+    plt.title("Speed vs Time")
+    plt.grid(True)
+    plt.savefig("speed.png", dpi=300)
+    print("Saved speed.png")
+
+    K_trace = trace_learned.gains["K"]
+
+    stiff_trace = [np.trace(K) for K in K_trace]
+
+    plt.figure()
+    plt.plot(trace_learned.time, stiff_trace)
+    plt.xlabel("Time (s)")
+    plt.ylabel("Trace(K)")
+    plt.title("Stiffness Evolution")
+    plt.grid(True)
+    plt.savefig("stiffness.png", dpi=300)
+    print("Saved stiffness.png")
 
     pos_nom = trace_nominal.position
     pos_learned = trace_learned.position

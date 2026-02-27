@@ -23,6 +23,11 @@ class Compiler:
         def objective(trace):
 
             total_cost = 0.0
+            # ---- Time pressure penalty ----
+            # if hasattr(taskspec, "horizon_sec") and taskspec.horizon_sec is not None:
+            #     tau_actual = trace.time[-1]
+            #     time_violation = max(0.0, tau_actual - taskspec.horizon_sec)
+            #     total_cost += 200.0 * (time_violation ** 2)
 
             # Hard clause check (optional logging for now)
             # --- Hard clauses with slack relaxation ---
