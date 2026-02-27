@@ -67,10 +67,10 @@ def optimize_tau_short():
     theta_dim = policy.parameter_dimension()
 
     theta_init = np.zeros(theta_dim)
-    sigma_init = np.ones(theta_dim) * 5.0
+    sigma_init = policy.structured_sigma()  # uniform σ=5.0 for all groups
     pi2 = PI2(theta=theta_init, sigma=sigma_init, lam=0.01, decay=0.98)
 
-    N_SAMPLES, N_UPDATES = 12, 80
+    N_SAMPLES, N_UPDATES = 12, 100
     best_cost  = float("inf")
     best_theta = theta_init.copy()
 

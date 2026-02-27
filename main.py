@@ -14,6 +14,7 @@ from core.certified_policy import CertifiedPolicy
 from optimization.optimizer import PI2
 
 from spec.json_parser import load_taskspec_from_json
+from experiment_checkpoint_warmstart import save_checkpoint
 
 
 
@@ -51,7 +52,7 @@ def main():
     theta_dim = certified_policy.parameter_dimension()
 
     theta_init = np.zeros(theta_dim)
-    sigma_init = np.ones(theta_dim) * 5.0
+    sigma_init = certified_policy.structured_sigma()  # uniform σ=5.0 for all groups
 
     pi2 = PI2(
         theta=theta_init,
@@ -76,11 +77,12 @@ def main():
     print("Starting Optimization...")
 
     N_SAMPLES = 12
-    N_UPDATES = 80
+    N_UPDATES = 100
 
     best_cost = float("inf")
 
     current_mean = theta_init.copy()
+    best_theta   = theta_init.copy()   # track the single best sample ever seen
 
     # ----------------------------
     # Optimization Loop
@@ -101,7 +103,10 @@ def main():
         # IMPORTANT: store updated mean
         current_mean, new_sigma, weights = pi2.update(samples, costs)
 
-        best_cost = min(best_cost, costs.min())
+        # Track best sample — NOT the mean (mean can have drifted SK weights)
+        if costs.min() < best_cost:
+            best_cost  = costs.min()
+            best_theta = samples[np.argmin(costs)].copy()
 
         print(
             f"Update {update_idx+1:02d} | "
@@ -111,7 +116,12 @@ def main():
         )
 
     print("Optimization Complete.")
-    trace_final = certified_policy.rollout(current_mean)
+    # Use best_theta (best single sample ever) not current_mean (drifted distribution mean)
+    trace_final = certified_policy.rollout(best_theta)
+
+    # Save checkpoint so compare_tau_initialization.py picks up this result
+    save_checkpoint(best_theta, taskspec.horizon_sec, best_cost, trace_final)
+
     rho_human_final = human_comfort_distance(trace_final, human_position, 0.15)
     print("Final min human robustness:", np.min(rho_human_final))
 
@@ -133,7 +143,7 @@ def main():
     import matplotlib.pyplot as plt
 
     trace_nominal = certified_policy.rollout(np.zeros(theta_dim))
-    trace_learned = certified_policy.rollout(current_mean)
+    trace_learned = certified_policy.rollout(best_theta)   # best sample, not drifted mean
 
     speed = np.linalg.norm(trace_learned.velocity, axis=1)
 

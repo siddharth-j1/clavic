@@ -115,16 +115,25 @@ class DMPWithGainScheduling:
             Flat weight vector.
         @param sizes (Tuple[int, int, int])
             Sizes of the weight matrices: (n_forcing_weights, n_damping_weights, n_stiffness_weights).
+
+        @note
+            SD and SK weights are hard-clipped to ±SK_CLIP before being written
+            into the RBF approximators.  This keeps the Cholesky ODE inputs bounded
+            (B = -α Ḋ - SK SK^T stays finite) so that K = Q^T Q never diverges
+            during exploration.  The stiffness penalty in compiler.py provides the
+            honest PI2 cost signal that steers the mean away from this boundary;
+            the clip only acts as a safety net for extreme samples.
         """
+        SK_CLIP = 15.0   # ±15 → max ||SK||_F^2 ≈ 1350 → tr(K) stays in low thousands (N/m)
         _, n_damping_weights, n_stiffness_weights = sizes
         off = 0
         for r in self.rbf_traj:
             n   = r.W.size
             r.W = theta[off:off + n].reshape(r.W.shape)
             off += n
-        self.rbf_SD.W   = theta[off:off + n_damping_weights].reshape(self.rbf_SD.W.shape)
+        self.rbf_SD.W   = np.clip(theta[off:off + n_damping_weights], -SK_CLIP, SK_CLIP).reshape(self.rbf_SD.W.shape)
         off             +=n_damping_weights
-        self.rbf_SK.W   = theta[off:off + n_stiffness_weights].reshape(self.rbf_SK.W.shape)
+        self.rbf_SK.W   = np.clip(theta[off:off + n_stiffness_weights], -SK_CLIP, SK_CLIP).reshape(self.rbf_SK.W.shape)
 
     def rollout_traj(self, sample_unsafe: bool = False):
         ts   = self.ts

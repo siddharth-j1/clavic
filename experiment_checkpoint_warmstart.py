@@ -105,7 +105,7 @@ def optimize_with_checkpoint_support(
     predicate_registry,
     n_updates=40,
     n_samples=12,
-    use_checkpoint=True,
+    use_checkpoint=False,
     checkpoint_path="optimal_checkpoint.npz"
 ):
     """
@@ -131,13 +131,16 @@ def optimize_with_checkpoint_support(
             theta_dim=theta_dim
         )
         if can_use:
-            sigma_init = np.ones(theta_dim) * 1.0  # ← tighter exploration (already near optimum)
+            sigma_init = certified_policy.structured_sigma(
+                sigma_traj_xy=1.0, sigma_traj_z=1.0,
+                sigma_sd=1.0,      sigma_sk=1.0
+            )  # ← tighter exploration (already near optimum)
         else:
             theta_init = np.zeros(theta_dim)
-            sigma_init = np.ones(theta_dim) * 5.0
+            sigma_init = certified_policy.structured_sigma()  # uniform σ=5.0
     else:
         theta_init = np.zeros(theta_dim)
-        sigma_init = np.ones(theta_dim) * 5.0
+        sigma_init = certified_policy.structured_sigma()  # uniform σ=5.0
     
     pi2 = PI2(
         theta=theta_init,

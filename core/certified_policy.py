@@ -8,11 +8,15 @@ class Trace:
     """
     Lightweight container for trajectory trace.
     """
-    def __init__(self, time, position, velocity, gains):
+    def __init__(self, time, position, velocity, gains,
+                 raw_sk_weights=None, raw_sd_weights=None):
         self.time = time
         self.position = position
         self.velocity = velocity
         self.gains = gains
+        # Pre-clip raw weights — used by compiler for honest stiffness penalty
+        self.raw_sk_weights = raw_sk_weights
+        self.raw_sd_weights = raw_sd_weights
 
 
 class CertifiedPolicy:
@@ -56,6 +60,37 @@ class CertifiedPolicy:
     def parameter_dimension(self):
     # +1 for time scaling parameter
         return self.theta_dim 
+
+    def structured_sigma(self, sigma_traj_xy=5.0, sigma_traj_z=5.0,
+                         sigma_sd=5.0, sigma_sk=5.0):
+        """
+        Build a per-parameter exploration noise vector.
+
+        Default: uniform σ=5.0 across all groups (same as original behaviour).
+        Individual groups can be overridden if needed, but the clip in
+        set_theta() (Fix B, ±15 on SD/SK weights) is the hard manifold
+        boundary that keeps K bounded — not sigma reduction.
+
+        Parameter layout (total = theta_dim):
+          [traj_X (51)] [traj_Y (51)] [traj_Z (51)] [SD (42)] [SK (42)]
+        """
+        n_traj, n_sd, n_sk = self.sizes
+        n_per_axis = n_traj // 3                    # 51 weights per axis
+
+        sigma = np.empty(self.theta_dim)
+        off = 0
+        # X-axis trajectory weights
+        sigma[off:off + n_per_axis] = sigma_traj_xy;  off += n_per_axis
+        # Y-axis trajectory weights
+        sigma[off:off + n_per_axis] = sigma_traj_xy;  off += n_per_axis
+        # Z-axis trajectory weights
+        sigma[off:off + n_per_axis] = sigma_traj_z;   off += n_per_axis
+        # SD (damping slack) weights
+        sigma[off:off + n_sd] = sigma_sd;              off += n_sd
+        # SK (stiffness slack) weights
+        sigma[off:off + n_sk] = sigma_sk;              off += n_sk
+
+        return sigma
 
     # def rollout(self, theta):
 
@@ -125,6 +160,12 @@ class CertifiedPolicy:
         # ----------------------------
         # Set DMP parameters
         # ----------------------------
+        # Extract raw SK/SD weights BEFORE set_theta clips them — needed for
+        # the honest stiffness penalty in compiler.py.
+        n_traj, n_sd, n_sk = self.sizes
+        raw_sd = theta_dmp[n_traj:n_traj + n_sd].copy()
+        raw_sk = theta_dmp[n_traj + n_sd:n_traj + n_sd + n_sk].copy()
+
         self.dmp.set_theta(theta_dmp, self.sizes)
 
         # ----------------------------
@@ -139,7 +180,9 @@ class CertifiedPolicy:
             gains={
                 "K": plan["K"],
                 "D": plan["D"]
-            }
+            },
+            raw_sk_weights=raw_sk,
+            raw_sd_weights=raw_sd,
         )
 
         return trace
