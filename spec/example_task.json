@@ -1,0 +1,27 @@
+{
+  "horizon_sec": 5.0,
+
+  "clauses": [
+    {
+      "type": "eventually",
+      "predicate": "AtGoalPose",
+      "weight": 5.0,
+      "modality": "REQUIRE",
+      "time_window": [0.0, 2.0]
+    },
+    {
+      "type": "always",
+      "predicate": "HumanComfortDistance",
+      "weight": 3.0,
+      "modality": "PREFER"
+    }
+  ],
+
+  "bindings": {
+    "AtGoalPose.target": [0.05, 0.72, 0.11],
+    "AtGoalPose.tolerance": 0.05,
+
+    "HumanComfortDistance.human_position": [0.30, 0.40, 0.11],
+    "HumanComfortDistance.preferred_distance": 0.15
+  }
+}

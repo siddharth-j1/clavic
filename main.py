@@ -1,0 +1,200 @@
+import numpy as np
+
+# ---- Spec ----
+from spec.taskspec import TaskSpec, Clause
+from spec.compiler import Compiler
+
+# ---- Logic ----
+from logic.predicates import at_goal_pose, human_comfort_distance
+
+# ---- Core ----
+from core.certified_policy import CertifiedPolicy
+
+# ---- Optimizer ----
+from optimization.optimizer import PI2
+
+from spec.json_parser import load_taskspec_from_json
+
+
+
+# ----------------------------
+# Predicate Registry
+# ----------------------------
+def build_predicate_registry():
+    return {
+        "AtGoalPose": at_goal_pose,
+        "HumanComfortDistance": human_comfort_distance
+    }
+
+
+# # ----------------------------
+# # TaskSpec Builder
+# # ----------------------------
+# def build_taskspec(goal_pose, human_position):
+
+#     clauses = [
+#         Clause(
+#             operator="eventually",
+#             predicate="AtGoalPose",
+#             weight=5.0,
+#             modality="REQUIRE",
+#             parameters={
+#                 "target": goal_pose,
+#                 "tolerance": 0.05
+#             }
+#         ),
+#         Clause(
+#             operator="always",
+#             predicate="HumanComfortDistance",
+#             weight=3.0,
+#             modality="PREFER",
+#             parameters={
+#                 "human_position": human_position,
+#                 "preferred_distance": 0.15  # realistic in this workspace
+#             }
+#         )
+#     ]
+
+#     return TaskSpec(
+#         horizon_sec=5.0,
+#         clauses=clauses
+#     )
+
+
+# ----------------------------
+# Main Execution
+# ----------------------------
+def main():
+
+    # ---- Scene Setup (MATCHES CGMS BACKBONE) ----
+    goal_pose = np.array([0.05, 0.72, 0.11])   # same as CertifiedPolicy
+    human_position = np.array([0.30, 0.40, 0.11])  # inside reachable workspace
+
+    #taskspec = build_taskspec(goal_pose, human_position)
+    taskspec = load_taskspec_from_json("spec/example_task.json")
+
+    predicate_registry = build_predicate_registry()
+
+    compiler = Compiler(predicate_registry)
+    objective_fn = compiler.compile(taskspec)
+
+    certified_policy = CertifiedPolicy()
+
+    theta_dim = certified_policy.parameter_dimension()
+
+    theta_init = np.zeros(theta_dim)
+    sigma_init = np.ones(theta_dim) * 5.0
+
+    pi2 = PI2(
+        theta=theta_init,
+        sigma=sigma_init,
+        lam=0.01,
+        decay=0.98
+    )
+
+    # ----------------------------
+    # DEBUG: Check nominal trajectory robustness
+    # ----------------------------
+    trace = certified_policy.rollout(np.zeros(theta_dim))
+
+    rho_goal = at_goal_pose(trace, goal_pose, 0.05)
+    rho_human = human_comfort_distance(trace, human_position, 0.15)
+
+    print("\n--- Nominal (theta = 0) robustness ---")
+    print("Nominal max goal robustness:", np.max(rho_goal))
+    print("Nominal min human robustness:", np.min(rho_human))
+    print("----------------------------------------\n")
+
+    print("Starting Optimization...")
+
+    N_SAMPLES = 12
+    N_UPDATES = 40
+
+    best_cost = float("inf")
+
+    current_mean = theta_init.copy()
+
+    # ----------------------------
+    # Optimization Loop
+    # ----------------------------
+    for update_idx in range(N_UPDATES):
+
+        samples = pi2.sample(N_SAMPLES)
+        costs = []
+
+        for i in range(N_SAMPLES):
+            theta = samples[i]
+            trace = certified_policy.rollout(theta)
+            cost = objective_fn(trace)
+            costs.append(cost)
+
+        costs = np.array(costs)
+
+        # IMPORTANT: store updated mean
+        current_mean, new_sigma, weights = pi2.update(samples, costs)
+
+        best_cost = min(best_cost, costs.min())
+
+        print(
+            f"Update {update_idx+1:02d} | "
+            f"Min: {costs.min():.4f} | "
+            f"Mean: {costs.mean():.4f} | "
+            f"BestSoFar: {best_cost:.4f}"
+        )
+
+    print("Optimization Complete.")
+    trace_final = certified_policy.rollout(current_mean)
+    rho_human_final = human_comfort_distance(trace_final, human_position, 0.15)
+    print("Final min human robustness:", np.min(rho_human_final))
+
+    print("Learned tau:", certified_policy.dmp.tau)
+
+    goal_rho_trace = at_goal_pose(trace_final, goal_pose, 0.05)
+    goal_times = trace_final.time
+    goal_satisfied_indices = goal_rho_trace > 0
+
+    if goal_satisfied_indices.any():
+        first_hit_time = goal_times[goal_satisfied_indices][0]
+        print("Goal first satisfied at time:", first_hit_time)
+    else:
+        print("Goal never satisfied")
+
+    # ----------------------------
+    # Visualize Nominal vs Learned
+    # ----------------------------
+    import matplotlib.pyplot as plt
+
+    trace_nominal = certified_policy.rollout(np.zeros(theta_dim))
+    trace_learned = certified_policy.rollout(current_mean)
+
+    pos_nom = trace_nominal.position
+    pos_learned = trace_learned.position
+
+    plt.figure(figsize=(6,6))
+
+    plt.plot(pos_nom[:,0], pos_nom[:,1], 'b--', label="Nominal")
+    plt.plot(pos_learned[:,0], pos_learned[:,1], 'r', label="Learned")
+
+    plt.scatter(pos_nom[0,0], pos_nom[0,1], c='green', s=100, label="Start")
+    plt.scatter(goal_pose[0], goal_pose[1], c='black', s=100, label="Goal")
+    plt.scatter(human_position[0], human_position[1], c='orange', s=100, label="Human")
+
+    circle = plt.Circle(
+        (human_position[0], human_position[1]),
+        0.15,
+        color='orange',
+        fill=False,
+        linestyle=':'
+    )
+    plt.gca().add_patch(circle)
+
+    plt.legend()
+    plt.axis('equal')
+    plt.title("Nominal vs Learned Trajectory")
+    plt.show()
+    plt.savefig("traj.png", dpi=300)
+    print("Saved traj.png")
+
+
+if __name__ == "__main__":
+    main()
