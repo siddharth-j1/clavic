@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from core.certified_policy import CertifiedPolicy
 from spec.compiler import Compiler
 from spec.json_parser import load_taskspec_from_json
-from logic.predicates import at_goal_pose, human_comfort_distance, velocity_limit, human_body_exclusion
+from logic.predicates import at_goal_pose, human_comfort_distance, velocity_limit, human_body_exclusion, early_completion
 from optimization.optimizer import PI2
 
 
@@ -60,6 +60,7 @@ def optimize_tau_short():
         "HumanComfortDistance":  human_comfort_distance,
         "HumanBodyExclusion":    human_body_exclusion,
         "VelocityLimit":         velocity_limit,
+        "EarlyCompletion":       early_completion,
     }
     objective_fn = Compiler(predicate_registry).compile(taskspec)
 

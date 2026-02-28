@@ -12,6 +12,8 @@ class Compiler:
 
     def compile(self, taskspec):
 
+        tau_budget = float(taskspec.horizon_sec)   # normalises the time penalty
+
         hard_clauses = []
         soft_clauses = []
 
@@ -62,6 +64,37 @@ class Compiler:
                 w = trace.raw_sd_weights
                 excess = np.maximum(0.0, np.abs(w) - SK_CLIP)
                 total_cost += STIFF_WEIGHT * float(np.mean(excess**2))
+
+            # --- Stiffness rate penalty (penalises steep jumps in tr(K)) ---
+            # PI2 sees a real cost for trajectories where tr(K) changes rapidly,
+            # which physically means the impedance controller would demand sudden
+            # torque spikes.  We penalise the RMS of the finite-difference derivative
+            # of tr(K) along the trajectory.
+            #
+            #   cost += RATE_WEIGHT * sqrt( mean( (Δtr(K)/Δt)² ) )
+            #
+            # dt=0.01s so a jump of 680 N/m in one step → rate = 68000 N/m/s
+            # RATE_WEIGHT=5e-4: at rms=668 N/m/s → penalty ≈ 0.33  (gentle signal)
+            # Enough to distinguish spiky trajectories from smooth ones without
+            # destabilising the PI2 landscape.
+            RATE_WEIGHT = 5e-4
+            if hasattr(trace, 'gains') and trace.gains is not None:
+                K_arr = trace.gains["K"]                          # (T,3,3)
+                trK   = np.array([np.trace(K_arr[i]) for i in range(len(K_arr))])
+                dt    = float(trace.time[1] - trace.time[0]) if len(trace.time) > 1 else 0.01
+                dtrK_dt = np.diff(trK) / dt                       # (T-1,) N/m/s
+                total_cost += RATE_WEIGHT * float(np.sqrt(np.mean(dtrK_dt**2)))
+
+            # --- Time penalty (only active when tau is learnable) ---
+            # Penalises long trajectories: cost += TIME_WEIGHT * (tau / tau_budget)
+            #   tau == tau_budget  → +TIME_WEIGHT   (worst, full horizon used)
+            #   tau == tau_min     → +TIME_WEIGHT * tau_min/tau_budget  (best)
+            # The hard VelocityLimit REQUIRE clause prevents the optimizer from
+            # going arbitrarily fast — it finds the shortest tau that satisfies
+            # all constraints.
+            TIME_WEIGHT = 5.0
+            if hasattr(trace, 'tau') and trace.tau is not None:
+                total_cost += TIME_WEIGHT * float(trace.tau) / tau_budget
 
             return total_cost
 
