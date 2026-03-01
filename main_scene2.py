@@ -75,9 +75,11 @@ def main():
     # Reduce exploration noise for the hold phase — its nominal is already
     # nearly correct (start == end → min-jerk stays put).  Large noise only
     # causes the held position to drift and violate HoldAtWaypoint.
+    # Using 0.05 (20× smaller) so PI2 barely perturbs hold-phase weights;
+    # speed_threshold is now 0.01 m/s so we need tight control here.
     hold_off   = policy.offsets[1]
     hold_dim   = policy.theta_dims[1]
-    sigma_init[hold_off:hold_off + hold_dim] *= 0.2   # 5× smaller sigma
+    sigma_init[hold_off:hold_off + hold_dim] *= 0.05   # 20× smaller sigma (was 0.2)
 
     pi2 = PI2(
         theta=theta_init,
@@ -138,8 +140,8 @@ def main():
           f"(body={np.min(obs_dist)*100:.1f} cm, radius=8 cm)")
 
     speed = np.linalg.norm(trace_final.velocity, axis=1)
-    mask_hold = (trace_final.time >= 2.0) & (trace_final.time <= 4.0)
-    print(f"Max speed during hold (2-4s): {np.max(speed[mask_hold]):.4f} m/s")
+    mask_hold = (trace_final.time >= 2.05) & (trace_final.time <= 4.0)
+    print(f"Max speed during hold (2.05-4s): {np.max(speed[mask_hold]):.4f} m/s  (threshold=0.01)")
 
     # ---- Plotting ----
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
@@ -172,7 +174,7 @@ def main():
     ax = axes[0, 1]
     ax.plot(trace_final.time, speed, 'b-')
     ax.axvspan(2.0, 4.0, alpha=0.1, color='green', label='Hold phase')
-    ax.axhline(0.05, color='gray', linestyle='--', label='Speed threshold')
+    ax.axhline(0.01, color='gray', linestyle='--', label='Speed threshold (0.01 m/s)')
     ax.set_xlabel("Time (s)"); ax.set_ylabel("Speed (m/s)")
     ax.set_title("Speed vs Time"); ax.legend(); ax.grid(True)
 

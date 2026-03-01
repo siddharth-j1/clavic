@@ -1,12 +1,12 @@
 {
-  "horizon_sec": 6.0,
+  "horizon_sec": 10.0,
 
   "phases": [
     {
       "label": "approach",
       "start": [0.55, 0.00, 0.11],
       "end":   [0.30, 0.55, 0.11],
-      "duration": 2.0
+      "duration": 4.0
     },
     {
       "label": "hold",
@@ -20,7 +20,7 @@
       "label": "go_to_goal",
       "start": [0.30, 0.55, 0.11],
       "end":   [0.05, 0.72, 0.11],
-      "duration": 2.0
+      "duration": 4.0
     }
   ],
 
@@ -30,16 +30,16 @@
       "predicate": "AtWaypoint",
       "weight": 8.0,
       "modality": "REQUIRE",
-      "time_window": [0.0, 2.0],
+      "time_window": [0.0, 4.0],
       "_comment": "Reach waypoint region within phase 1 (0-2s)"
     },
     {
       "type": "always_during",
       "predicate": "HoldAtWaypoint",
-      "weight": 6.0,
+      "weight": 10.0,
       "modality": "REQUIRE",
-      "time_window": [2.0, 4.0],
-      "_comment": "Stay at waypoint with zero velocity during phase 2 (2-4s)"
+      "time_window": [4.05, 6.0],
+      "_comment": "Stay at waypoint with near-zero velocity during phase 2 (2-4s). Window starts at 2.05 to skip the single boundary-velocity point from phase 1."
     },
     {
       "type": "eventually",
@@ -69,7 +69,7 @@
 
     "HoldAtWaypoint.waypoint":        [0.30, 0.55, 0.11],
     "HoldAtWaypoint.tolerance":       0.05,
-    "HoldAtWaypoint.speed_threshold": 0.05,
+    "HoldAtWaypoint.speed_threshold": 0.01,
 
     "AtGoalPose.target":    [0.05, 0.72, 0.11],
     "AtGoalPose.tolerance": 0.05,
@@ -77,6 +77,6 @@
     "ObstacleAvoidance.obstacle_position": [0.40, 0.30, 0.11],
     "ObstacleAvoidance.safe_radius": 0.08,
 
-    "VelocityLimit.vmax": 1.0
+    "VelocityLimit.vmax": 1.2
   }
 }

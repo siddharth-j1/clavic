@@ -1,0 +1,138 @@
+{
+  "_description": "Real Franka workspace task - cup handover to human",
+  "_coordinate_notes": [
+    "All positions lifted to safe_z = 0.297 m (max measured Z = 0.257 m at hold + 4 cm clearance).",
+    "Laptop modelled as ONE circle: centre = geometric centre of the 4 corners,",
+    "  radius = half-diagonal (0.2030 m) + 2 cm margin = 0.223 m.",
+    "  All key points (start, hold, goal) have >=6 cm clearance from this circle.",
+    "  hold->goal straight line clips the circle -> optimizer arcs around laptop back.",
+    "Point #1 start=[0.36845,-0.07430,0.12793] lifted to z=0.297.",
+    "Point #7 hold =[0.61554, 0.27877,0.25742] lifted to z=0.297.",
+    "Point #6 goal =[0.30180, 0.72820,0.20562] lifted to z=0.297.",
+    "Laptop corners: [0.510,0.234],[0.167,0.250],[0.165,0.448],[0.511,0.463].",
+    "Laptop centre=[0.33825,0.34875], half-diagonal=0.2030, r_safe=0.223."
+  ],
+  "horizon_sec": 10.0,
+  "phases": [
+    {
+      "label": "approach_hold",
+      "_comment": "Start (holding cup) -> hold position above laptop right edge",
+      "start": [
+        0.36845,
+        -0.0743,
+        0.297
+      ],
+      "end": [
+        0.61554,
+        0.27877,
+        0.297
+      ],
+      "duration": 4.0
+    },
+    {
+      "label": "hold",
+      "_comment": "Hold still 2 s (start==end -> min-jerk nominal velocity=0)",
+      "start": [
+        0.61554,
+        0.27877,
+        0.297
+      ],
+      "end": [
+        0.61554,
+        0.27877,
+        0.297
+      ],
+      "duration": 2.0,
+      "n_bfs_traj": 11,
+      "n_bfs_slack": 3
+    },
+    {
+      "label": "goto_goal",
+      "_comment": "Hold position -> human (goal), arc around laptop back",
+      "start": [
+        0.61554,
+        0.27877,
+        0.297
+      ],
+      "end": [
+        0.3018,
+        0.7282,
+        0.297
+      ],
+      "duration": 4.0
+    }
+  ],
+  "clauses": [
+    {
+      "type": "eventually_during",
+      "predicate": "AtWaypoint",
+      "weight": 8.0,
+      "modality": "REQUIRE",
+      "time_window": [
+        0.0,
+        4.0
+      ],
+      "_comment": "Reach hold waypoint within phase 1 (0-4 s)"
+    },
+    {
+      "type": "always_during",
+      "predicate": "HoldAtWaypoint",
+      "weight": 10.0,
+      "modality": "REQUIRE",
+      "time_window": [
+        4.05,
+        6.0
+      ],
+      "_comment": "Stay at hold with near-zero velocity (phase 2). Window starts 50 ms late."
+    },
+    {
+      "type": "eventually",
+      "predicate": "AtGoalPose",
+      "weight": 8.0,
+      "modality": "REQUIRE",
+      "_comment": "Reach the human (goal) at some point in phase 3"
+    },
+    {
+      "type": "always",
+      "predicate": "LaptopExclusion",
+      "weight": 15.0,
+      "modality": "REQUIRE",
+      "_comment": "Never enter laptop circumscribed circle (diagonal radius)"
+    },
+    {
+      "type": "always",
+      "predicate": "VelocityLimit",
+      "weight": 8.0,
+      "modality": "REQUIRE",
+      "_comment": "Cap Cartesian speed to 0.8 m/s"
+    }
+  ],
+  "bindings": {
+    "AtWaypoint.waypoint": [
+      0.61554,
+      0.27877,
+      0.297
+    ],
+    "AtWaypoint.tolerance": 0.04,
+    "HoldAtWaypoint.waypoint": [
+      0.61554,
+      0.27877,
+      0.297
+    ],
+    "HoldAtWaypoint.tolerance": 0.04,
+    "HoldAtWaypoint.speed_threshold": 0.01,
+    "AtGoalPose.target": [
+      0.3018,
+      0.7282,
+      0.297
+    ],
+    "AtGoalPose.tolerance": 0.05,
+    "LaptopExclusion.obstacle_position": [
+      0.33825,
+      0.34875,
+      0.297
+    ],
+    "LaptopExclusion.safe_radius": 0.223,
+    "VelocityLimit.vmax": 0.8
+  }
+}

@@ -80,3 +80,20 @@ def hold_at_waypoint(trace, waypoint, tolerance=0.03, speed_threshold=0.05):
     rho_pos = at_waypoint(trace, waypoint, tolerance)
     rho_vel = zero_velocity(trace, speed_threshold)
     return np.minimum(rho_pos, rho_vel)
+
+
+def early_completion(trace, target, tolerance=0.05, early_time=1.0):
+    """
+    Reward for reaching the goal *before* early_time.
+    rho > 0  →  goal reached before early_time
+    rho < 0  →  goal not reached early enough
+    Used in compare_tau_initialization.py to reward fast (tau=0.5s) solutions.
+    """
+    pos = trace.position
+    d   = np.linalg.norm(pos - target, axis=1)
+    at_goal = tolerance - d                 # > 0 when inside tolerance
+    # Find if goal was reached before early_time
+    mask_early = trace.time <= early_time
+    if np.any(mask_early):
+        return float(np.max(at_goal[mask_early]))
+    return float(np.max(at_goal))

@@ -1,0 +1,341 @@
+Instructions for you to follow :
+1. dont hallucinate anything, do proper research in below given context then respond.
+2. conda env we are using is clavic, before running any cmd in new terminal
+   activate this env.
+3. don not run any process in background run in termianl with full Output
+   so i can also see that what is going on.
+
+
+
+we  were doing, can you once again fo to out current workspace code to have a idea of below impletation:
+we are using two base papers:
+1. cgms : paper - https://arxiv.org/html/2511.16330v1
+ code - https://github.com/siddharthjainsid1411/cgms_safe_via_point
+ 2 . wltl : paper - https://ieeexplore.ieee.org/stamp/stamp.jsp?arnumber=9811707
+ code : https://github.com/siddharthjainsid1411/wltl
+
+ and using above as base we are working on below draft whose latex code is below:
+
+\title{CLAVIC: Certified Language-guided Variable Impedance Control with Temporal Logic Preferences
+ \\
+% \author{Giovanni Franzese$^{*\dagger}$, Anna M\'esz\'aros$^\dagger$, Luka Peternel, and Jens Kober}
+%{\footnotesize \textsuperscript{*}Note: Sub-titles are not captured in Xplore and should not be used}
+% \thanks{This research is funded by ARTPARK, DRDO.}
+% \thanks{The authors are with Human-interactive Robotics Lab, Cyber Physical Systems(e-mail: ravipr@iisc.ac.in).}
+% \thanks{$^*$Corresponding Author $^\dagger$These authors contributed equally to this work.} 
+%\thanks{This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be accessible}
+% \thanks{1. \textbf{This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be accessible.}}
+%\thanks{Identify applicable funding agency here. If none, delete this.}
+}
+\maketitle
+
+
+
+
+
+\section{INTRODUCTION}
+
+\section{PRELIMINARIES}
+
+
+\section{METHODOLOGY}
+
+\subsection{Problem Formulation and Notation}
+
+We consider a finite-horizon robotic manipulation task executed over continuous time
+$t \in [0,\tau]$, where $\tau > 0$ denotes the task duration.
+The objective is to generate a feasible end-effector motion and
+time-varying impedance policy that satisfy hard physical constraints while
+optimizing user-specified task preferences.
+
+\textbf{End-effector pose.}
+The end-effector pose is defined as
+\begin{equation}
+x(t) = \big(p(t), q(t)\big),
+\end{equation}
+where $p(t) \in \mathbb{R}^3$ denotes Cartesian position and
+$q(t) \in \mathbb{S}^3$ is a unit quaternion representing orientation,
+with $\|q(t)\| = 1$.
+
+Quaternion multiplication is denoted by $\otimes$ and the inverse by
+$q^{-1}$.
+
+\textbf{Quaternion distance.}
+For two orientations $q_1$ and $q_2$, we define the relative quaternion
+\begin{equation}
+q_e = q_1 \otimes q_2^{-1},
+\end{equation}
+and the geodesic angular distance
+\begin{equation}
+d_q(q_1, q_2) =
+2 \arccos\!\left( \big| (q_e)_w \big| \right) \in [0,\pi],
+\end{equation}
+where $(\cdot)_w$ denotes the scalar component.
+The absolute value resolves the quaternion sign ambiguity.
+
+\textbf{Time discretization.}
+Constraints and costs are evaluated on a uniform grid
+$\{t_k\}_{k=0}^{N}$ with $t_0 = 0$ and $t_N = \tau$.
+
+\textbf{Policy parameters.}
+A rollout-generating policy is parameterized as
+\begin{equation}
+\pi_{\Theta}, \quad
+\Theta = (\theta, \psi),
+\end{equation}
+where $\theta$ parameterizes the desired pose trajectory and
+$\psi$ parameterizes controller quantities such as impedance gains.
+
+\subsection{Pose Motion Primitive Representation}
+
+We represent the desired reference trajectory as
+\begin{equation}
+x_d(t;\theta) =
+\big(p_d(t;\theta_p), q_d(t;\theta_q)\big),
+\end{equation}
+with parameter vector $\theta = (\theta_p,\theta_q)$.
+
+The framework is agnostic to the specific primitive representation
+(e.g., splines or dynamic movement primitives) provided that
+
+\begin{enumerate}
+\item the trajectory is reproducible from $\theta$, and
+\item the trajectory supports temporal scaling.
+\end{enumerate}
+
+\textbf{Time scaling.}
+We separate trajectory shape from duration by introducing the normalized phase
+\begin{equation}
+s = \frac{t}{\tau}.
+\end{equation}
+Thus, the same parameter vector $\theta$ can be executed under different
+durations by modifying $\tau$.
+
+\subsection{Variable Impedance Execution Model}
+
+The robot tracks the reference trajectory using a time-varying
+operational-space impedance controller.
+
+Let $\tilde{x}(t)$ denote the task-space tracking error.
+The closed-loop dynamics are modeled as
+\begin{equation}
+H \ddot{\tilde{x}}(t)
++ D(t)\dot{\tilde{x}}(t)
++ K(t)\tilde{x}(t)
+= f_e(t),
+\end{equation}
+where
+
+\begin{itemize}
+\item $H \succ 0$ is the inertia matrix,
+\item $K(t) \succ 0$ is the stiffness matrix,
+\item $D(t) \succ 0$ is the damping matrix,
+\item $f_e(t)$ represents bounded disturbances.
+\end{itemize}
+
+To ensure stability of time-varying impedance schedules,
+we enforce Lyapunov-style matrix inequalities
+\begin{align}
+\alpha H - D(t) &\preceq 0, \\
+\dot{K}(t) + \alpha \dot{D}(t)
+- 2 \alpha K(t) &\preceq 0,
+\end{align}
+for some constant $\alpha > 0$.
+
+These conditions are treated as hard constraints and enforced
+by construction.
+
+\subsection{Predicate Library Over Pose and Dynamics}
+
+We define a predicate library $\Pi$ evaluated over the rollout trace
+\begin{equation}
+\mathcal{T}
+=
+\left\{
+p(t), q(t), K(t), D(t)
+\right\}_{t \in [0,\tau]}.
+\end{equation}
+
+Each predicate produces a scalar robustness margin used for
+optimization.
+
+\subsubsection{Position and Pose Predicates}
+
+Examples include:
+
+\begin{align}
+p(t) &\in \mathcal{R}, \\
+\|p(t) - \bar{p}\| &\le \epsilon_p, \\
+d_q\big(q(t), \bar{q}\big) &\le \epsilon_q, \\
+d_O(p(t)) &\ge d_{\min}, \\
+\|\dot{p}(t)\| &\le v_{\max}.
+\end{align}
+
+\subsubsection{Orientation Constraints}
+
+Orientation predicates are uniformly defined using quaternion distance.
+
+\textbf{Orientation waypoint}
+\begin{equation}
+d_q\big(q(t), \bar{q}\big) \le \epsilon_q.
+\end{equation}
+
+\textbf{Orientation limit}
+\begin{equation}
+d_q\big(q(t), q_{\mathrm{ref}}\big)
+\le \theta_{\max}.
+\end{equation}
+
+\textbf{Pose waypoint}
+\begin{equation}
+\|p(t)-\bar{p}\| \le \epsilon_p
+\;\wedge\;
+d_q(q(t),\bar{q}) \le \epsilon_q.
+\end{equation}
+
+\subsection{Typed Specification: Hard and Soft Constraints}
+
+Each predicate template is assigned an enforcement type:
+
+\begin{itemize}
+\item \texttt{HARD\_ONLY:}
+collision avoidance, actuator limits, impedance stability.
+\item \texttt{SOFT\_ALLOWED:}
+preferences such as comfort zones or region preferences.
+\item \texttt{SOFT\_ONLY:}
+style costs (e.g., smoothness).
+\end{itemize}
+
+Hard constraints are never relaxed during optimization,
+whereas soft constraints may be violated with penalty.
+
+\subsection{Language Interface and Deterministic Compilation}
+
+User instructions are converted into a structured task specification
+\begin{equation}
+\mathcal{S}
+=
+(\varphi, w, \Lambda, \tau, \text{bindings}),
+\end{equation}
+where
+
+\begin{itemize}
+\item $\varphi$ is a weighted temporal logic formula,
+\item $w$ are logic weights,
+\item $\Lambda$ are cost weights,
+\item $\tau$ is task duration,
+\item bindings map symbolic entities to scene parameters.
+\end{itemize}
+
+A deterministic compiler validates syntax, enforces typing rules,
+and constructs both hard constraints and rollout costs.
+
+\subsection{Hard Constraint Enforcement via Slack-Manifold Sampling}
+
+Let $z$ denote rollout-dependent quantities determined by policy parameters.
+Hard constraints are expressed as
+\begin{equation}
+g_i(z,t_k) \le 0.
+\end{equation}
+
+We introduce slack variables $s_{i,k}$ such that
+\begin{equation}
+g_i(z,t_k) + s_{i,k}^2 = 0.
+\end{equation}
+
+This guarantees $g_i \le 0$ without penalties or projections.
+
+Matrix inequalities are enforced using matrix slack variables.
+For example,
+\begin{equation}
+\alpha H - D(t_k)
+=
+- S_D(t_k) S_D^\top(t_k).
+\end{equation}
+
+Positive definiteness of stiffness is enforced via
+\begin{equation}
+K(t_k) = Q^\top(t_k) Q(t_k).
+\end{equation}
+
+All unconstrained coordinates are collected into
+\begin{equation}
+\xi = (\theta, \omega),
+\end{equation}
+and mapped to feasible controller parameters through
+\begin{equation}
+(\theta, \psi) = F(\xi).
+\end{equation}
+
+Sampling $\xi$ therefore produces only feasible rollouts.
+
+\subsection{Soft Preferences via Temporal Logic Robustness}
+
+Given temporal logic specification $\varphi$,
+we compute rollout robustness
+$\rho(\mathcal{T},\varphi)$.
+A smooth approximation $\rho_e$ is used during optimization.
+
+The logic cost is defined as
+\begin{equation}
+J_{\mathrm{TL}}(\mathcal{T})
+=
+\max
+\left(
+0,\,
+-\rho_e(\mathcal{T},\varphi)
+\right).
+\end{equation}
+
+\subsection{Total Objective Function}
+
+The complete rollout objective is
+\begin{equation}
+J(\mathcal{T})
+=
+\lambda_{\mathrm{TL}} J_{\mathrm{TL}}(\mathcal{T})
++
+\sum_j \lambda_j J_j(\mathcal{T}),
+\end{equation}
+where $J_j$ are auxiliary costs such as smoothness and effort.
+
+Hard constraints do not appear in the objective,
+since feasibility is enforced by construction.
+
+\subsection{Optimization on the Feasible Manifold}
+
+We optimize over $\xi$ using sampling-based policy improvement
+(PI$^2$/PIBB).
+
+Samples are drawn from
+\begin{equation}
+\xi^{(m)} \sim \mathcal{N}(\mu,\Sigma).
+\end{equation}
+
+For each sample:
+
+\begin{enumerate}
+\item Construct feasible parameters via $F(\xi^{(m)})$,
+\item Execute rollout to obtain trace $\mathcal{T}^{(m)}$,
+\item Evaluate cost $J(\mathcal{T}^{(m)})$,
+\item Update $(\mu,\Sigma)$ using importance weighting.
+\end{enumerate}
+
+Because feasibility is guaranteed, exploration never violates
+hard constraints.
+
+\subsection{Outputs and Guarantees}
+
+At convergence, the method produces:
+
+\begin{itemize}
+\item reference trajectory $x_d(t)$,
+\item time-varying impedance gains $K(t)$ and $D(t)$.
+\end{itemize}
+
+The resulting policy satisfies all hard constraints by construction,
+while soft preferences are optimized according to weighted
+temporal logic robustness.
+
+
+
