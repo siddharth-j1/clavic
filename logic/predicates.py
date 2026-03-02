@@ -221,3 +221,73 @@ def dont_pour_until_at_goal(trace, q_pour, pour_tolerance_rad=0.3,
     )
 
     return rho_phi, rho_psi
+
+
+# ------------------------------------------------------------------ #
+#         Directional (per-axis) stiffness near human                #
+# ------------------------------------------------------------------ #
+
+def directional_stiffness_near_human(trace, human_position, proximity_radius,
+                                     k_max_near_human=80.0):
+    """
+    Per-axis stiffness penalty when the robot is near the human.
+
+    When the end-effector is within *proximity_radius* of the human, each
+    diagonal stiffness element K_ii is penalised if it exceeds
+    *k_max_near_human*.  The penalty is direction-aware: the axis with
+    the largest displacement toward the human gets the LOWEST allowed
+    stiffness (strongest penalty), ensuring the robot is most compliant
+    in the approach direction.
+
+    Robustness signal (per timestep):
+        rho(t) = min_i [ k_allowed_i(t) - K_ii(t) ]
+    where
+        k_allowed_i = k_max_near_human / (1 + alpha * |d_i| / ||d||)
+    with d = p - p_human  and  alpha = 1.0 (direction weighting).
+    Outside the proximity radius, rho(t) = +inf (always satisfied).
+
+    The min over axes makes it a conjunction: ALL axes must comply.
+
+    Parameters
+    ----------
+    trace               : Trace with gains["K"] (T, 3, 3)
+    human_position      : array (3,)  human position
+    proximity_radius    : float       activation radius (m)
+    k_max_near_human    : float       max per-axis stiffness near human (N/m)
+    """
+    if trace.gains is None or "K" not in trace.gains:
+        raise ValueError("Stiffness gains (K) not available in trace.")
+
+    pos = trace.position                      # (T, 3)
+    K_arr = trace.gains["K"]                  # (T, 3, 3)
+    human = np.asarray(human_position, float) # (3,)
+    T = pos.shape[0]
+    rho = np.full(T, 1e3)                    # default: very satisfied (outside zone)
+
+    ALPHA = 1.0  # direction weighting factor
+
+    for t in range(T):
+        d = pos[t] - human                    # displacement from human
+        dist = np.linalg.norm(d)
+
+        if dist >= proximity_radius:
+            continue  # outside zone — no penalty
+
+        # Direction-aware stiffness limit:
+        # Axis aligned with approach direction gets stricter limit
+        if dist > 1e-6:
+            d_norm = np.abs(d) / dist         # (3,) unit direction weights in [0,1]
+        else:
+            d_norm = np.ones(3) / np.sqrt(3)  # at human: equal penalty all axes
+
+        # Allowed stiffness per axis — lower where approach direction is large
+        k_allowed = k_max_near_human / (1.0 + ALPHA * d_norm)  # (3,)
+
+        # Actual diagonal stiffness
+        k_diag = np.array([K_arr[t, 0, 0], K_arr[t, 1, 1], K_arr[t, 2, 2]])
+
+        # Per-axis robustness: k_allowed - k_actual (>0 means compliant enough)
+        rho_axes = k_allowed - k_diag
+        rho[t] = np.min(rho_axes)             # conjunction over axes
+
+    return rho

@@ -7,8 +7,32 @@ import numpy as np
 
 class Compiler:
 
-    def __init__(self, predicate_registry):
+    def __init__(self, predicate_registry,
+                 human_position=None, human_proximity_radius=None,
+                 k_max_global=None):
+        """
+        Parameters
+        ----------
+        predicate_registry : dict   — name → callable
+        human_position     : array (3,) or None
+            If provided, enables the proximity-stiffness cost: when the
+            end-effector is within *human_proximity_radius* of this point,
+            tr(K) is penalised if it exceeds a low threshold.
+            This is an implicit cost (like K_MAX ceiling) — no JSON change needed.
+            When None (default), the cost is skipped → existing scenes unaffected.
+        human_proximity_radius : float or None
+            Activation radius (metres).  Only used when human_position is set.
+        k_max_global : float or None
+            Override the global tr(K) ceiling (default 600 N/m).
+            Useful when K0 is raised (e.g., K0=500 → nominal tr(K)=1500,
+            so the ceiling should be raised to ~1800).
+            When None, defaults to 600 N/m (backward-compatible).
+        """
         self.predicate_registry = predicate_registry
+        self.human_position = (np.asarray(human_position, float)
+                               if human_position is not None else None)
+        self.human_proximity_radius = human_proximity_radius
+        self.k_max_global = k_max_global
 
     def compile(self, taskspec):
 
@@ -83,19 +107,18 @@ class Compiler:
                         total_cost += SMOOTH_WEIGHT * float(np.mean(diffs**2))
 
             # --- Hard K ceiling penalty ---
-            # The Q-ODE Q̇ = α·Q + 0.5·Q⁻ᵀ·B is exponentially growing when
-            # SK weights are large; SK_CLIP=±15 still allows tr(K) to reach
-            # ~20,000+ N/m over a long phase.  This penalty directly penalises
-            # any trace where tr(K) exceeds K_MAX, giving PI2 a clear signal
-            # to avoid solutions that would cause excessive stiffness.
-            # K_MAX = 600 N/m (3 axes × 200 N/m) — 3× nominal, safely below Franka limit 3000 N/m
-            K_MAX       = 600.0   # N/m (tr(K) = sum of diagonal stiffnesses)
-            K_CEIL_WEIGHT = 2.0   # same weight class as damping regulariser
+            # Safety net ONLY: prevent runaway tr(K) > 3000 N/m.
+            # This is a very loose ceiling — it should NOT pull K down during
+            # normal operation (K0=200, tr(K) ≈ 600 at nominal).
+            # The tight per-axis human-proximity penalty handles the real
+            # stiffness reduction near the human.
+            # K_MAX is set very high (3000) so this only fires on runaway cases.
+            K_MAX         = 3000.0   # safety ceiling only — not a shaping cost
+            K_CEIL_WEIGHT = 1.0
             if trace.gains is not None and "K" in trace.gains:
                 K_arr = trace.gains["K"]
                 trK_arr = np.array([np.trace(K) for K in K_arr])
                 excess_k = np.maximum(0.0, trK_arr - K_MAX)
-                # Normalise by K_MAX² so cost is O(1) when trK = 2·K_MAX
                 total_cost += K_CEIL_WEIGHT * float(np.mean((excess_k / K_MAX)**2))
 
             # --- Minimum damping regularizer (hardware safety) ---
@@ -115,6 +138,69 @@ class Compiler:
                 # Normalise deficit by D_MIN_TRACE so penalty is dimensionless
                 deficit_frac = np.maximum(0.0, (D_MIN_TRACE - trD_arr) / D_MIN_TRACE)
                 total_cost += DAMP_WEIGHT * float(np.mean(deficit_frac**2))
+
+            # --- Human-proximity per-axis stiffness reduction (optional) ---
+            #
+            # DESIGN INTENT: K should stay HIGH (≈ K0) far from human, then
+            # smoothly reduce as the arm approaches, and stay LOW (≤ K_AXIS_MAX)
+            # inside the proximity radius. No global K ceiling — stiffness is
+            # only shaped near the human.
+            #
+            # Implementation:
+            #   - Soft ramp zone: [r_h, 3·r_h] — linear weight 0→1 as d decreases
+            #     from 3·r_h to r_h. Penalty gently starts here, so K begins
+            #     dropping BEFORE entering the hard-safety radius.
+            #   - Hard zone: d < r_h — full penalty weight, K_ii must be ≤ K_AXIS_MAX
+            #
+            # Weight function w(d):
+            #   d ≥ 3·r_h  → w = 0   (no penalty, K free to be high)
+            #   r_h ≤ d < 3·r_h → w = (3·r_h - d) / (2·r_h)  ∈ (0, 1]  (ramp)
+            #   d < r_h    → w = 1   (full penalty)
+            #
+            # Pour-phase stiffness: The pour phase CGMS sub-policy resets K at
+            # t=T_phase_start. If the pour happens at the human position, K must
+            # ALSO stay low during pour (arm is still next to human).
+            # The penalty applies to ALL timesteps within 3·r_h, regardless of phase.
+            #
+            # CGMS-safe: cost on trace output only. Cholesky ODE untouched.
+            if self.human_position is not None and self.human_proximity_radius is not None:
+                K_AXIS_MAX     = 100.0   # N/m per axis target inside proximity radius
+                HUMAN_K_WEIGHT = 8.0     # strong enough to overcome HoldAtWaypoint drive
+                RAMP_FACTOR    = 3.0     # ramp starts at RAMP_FACTOR × r_h
+
+                if trace.gains is not None and "K" in trace.gains:
+                    K_arr_h  = trace.gains["K"]          # (T, 3, 3)
+                    pos_h    = trace.position             # (T, 3)
+                    r_h      = self.human_proximity_radius
+                    r_ramp   = RAMP_FACTOR * r_h
+
+                    d_human  = np.linalg.norm(
+                        pos_h - self.human_position, axis=1)  # (T,)
+
+                    # All timesteps within the ramp zone (includes hard zone)
+                    ramp_mask = d_human < r_ramp
+
+                    if np.any(ramp_mask):
+                        ramp_idx = np.where(ramp_mask)[0]
+                        d_ramp   = d_human[ramp_idx]
+
+                        # Weight: 0 at r_ramp, 1 at r_h (and below)
+                        w_dist = np.clip(
+                            (r_ramp - d_ramp) / (r_ramp - r_h),
+                            0.0, 1.0)
+
+                        # Per-axis excess: penalise each K_ii independently
+                        per_step_cost = np.zeros(len(ramp_idx))
+                        for j, t_idx in enumerate(ramp_idx):
+                            K_t = K_arr_h[t_idx]
+                            excess_sum = 0.0
+                            for axis in range(3):
+                                kii = K_t[axis, axis]
+                                ex  = max(0.0, kii - K_AXIS_MAX)
+                                excess_sum += (ex / K_AXIS_MAX) ** 2
+                            per_step_cost[j] = w_dist[j] * excess_sum / 3.0
+
+                        total_cost += HUMAN_K_WEIGHT * float(np.mean(per_step_cost))
 
             return total_cost
 

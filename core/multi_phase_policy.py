@@ -32,7 +32,7 @@ class MultiPhaseCertifiedPolicy:
     DMPWithGainScheduling instance with its own weights.
     """
 
-    def __init__(self, phases):
+    def __init__(self, phases, K0=200.0, D0=30.0):
         """
         Parameters
         ----------
@@ -47,6 +47,10 @@ class MultiPhaseCertifiedPolicy:
                 start_quat  : list/array (4,)  [w,x,y,z]
                 end_quat    : list/array (4,)  [w,x,y,z]
                 n_bfs_ori   : int          (default 15)
+        K0 : float
+            Nominal stiffness per axis (N/m).  Default 200.
+        D0 : float
+            Nominal damping per axis (Ns/m).  Default 30.
         """
         self.phases = phases
         self.dmps = []
@@ -59,8 +63,6 @@ class MultiPhaseCertifiedPolicy:
 
         DT    = 0.01
         ALPHA = 0.05
-        K0    = 200.0
-        D0    = 30.0
         H     = np.eye(3)
 
         offset = 0
@@ -191,6 +193,12 @@ class MultiPhaseCertifiedPolicy:
             yd    = plan["yd_des"]
             K     = plan["K"]
             D     = plan["D"]
+
+            # Pass final Q of this phase as initial Q of next phase → no jerk at boundary
+            if idx + 1 < len(self.dmps):
+                Q_final = plan.get("Q_final", None)
+                if Q_final is not None:
+                    self.dmps[idx + 1].Q_init = Q_final
 
             # --- Orientation rollout (if present) ---
             q_des = None

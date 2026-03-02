@@ -54,6 +54,7 @@ class DMPWithGainScheduling:
         self.D0         = float(D0)
         self.slack_mag  = float(slack_mag)
         self.slack_rate = float(slack_rate_limit)
+        self.Q_init     = None   # set by multi_phase_policy for phase continuity
         self.ds         = DynamicalSystems(self.tau)
         
         y, yd, ydd, ts  = MinimumJerk(self.start, self.end, self.tau, self.dt).generate()
@@ -188,7 +189,10 @@ class DMPWithGainScheduling:
             return sym(-self.alpha*Ddt - SKt@SKt.T)
 
         Q    = np.zeros((T,3,3))
-        Q[0] = np.linalg.cholesky(sym(self.K0*np.eye(3)) + 1e-9*np.eye(3))
+        if self.Q_init is not None:
+            Q[0] = self.Q_init
+        else:
+            Q[0] = np.linalg.cholesky(sym(self.K0*np.eye(3)) + 1e-9*np.eye(3))
 
         def fQ(Qk, t):
             Bk = _B_at(t)
@@ -207,6 +211,7 @@ class DMPWithGainScheduling:
 
         return {
             "ts": ts, "y_des": y, "yd_des": yd, "ydd_des": ydd,
-            "SD": SD, "SK": SK,            
-            "D": D, "Ddot": Ddot, "K": K
+            "SD": SD, "SK": SK,
+            "D": D, "Ddot": Ddot, "K": K,
+            "Q_final": Q[-1].copy()   # pass to next phase for K continuity
         }
