@@ -1,0 +1,102 @@
+{
+  "_description": "Scene 3b: Ball delivery to human — soft obstacle avoidance only",
+  "_notes": [
+    "Same geometry as Scene 3 (start/goal/obstacle positions identical).",
+    "Key difference: obstacle avoidance is SOFT — the ball is harmless so",
+    "penetrating the obstacle zone is acceptable. The DMP repulsion still",
+    "steers the path away (smooth arc preferred) but NO hard projection backstop.",
+    "modality=SOFT for ObstacleAvoidance: optimizer is nudged to avoid the",
+    "obstacle but is never penalized with SLACK_WEIGHT * s^2.",
+    "This demonstrates the modular hard/soft toggle in set_obstacles().",
+    "",
+    "2-phase task: carry ball to human (0-7s), hold at human position (7-10s).",
+    "No pour: ball stays upright, no orientation change needed.",
+    "Stiffness reduction near human is still active (same CGMS compiler cost)."
+  ],
+  "horizon_sec": 10.0,
+  "phases": [
+    {
+      "label": "carry",
+      "start": [0.55, 0.00, 0.30],
+      "end":   [0.30, 0.55, 0.30],
+      "duration": 7.0,
+      "start_quat": [1.0, 0.0, 0.0, 0.0],
+      "end_quat":   [1.0, 0.0, 0.0, 0.0],
+      "n_bfs_ori": 15
+    },
+    {
+      "label": "hold",
+      "start": [0.30, 0.55, 0.30],
+      "end":   [0.30, 0.55, 0.30],
+      "duration": 3.0,
+      "n_bfs_traj": 11,
+      "n_bfs_slack": 3,
+      "start_quat": [1.0, 0.0, 0.0, 0.0],
+      "end_quat":   [1.0, 0.0, 0.0, 0.0],
+      "n_bfs_ori": 15
+    }
+  ],
+  "clauses": [
+    {
+      "type": "eventually_during",
+      "predicate": "AtWaypoint",
+      "weight": 8.0,
+      "modality": "REQUIRE",
+      "time_window": [0.0, 7.0],
+      "_comment": "Reach goal position within carry phase"
+    },
+    {
+      "type": "always_during",
+      "predicate": "HoldAtWaypoint",
+      "weight": 10.0,
+      "modality": "REQUIRE",
+      "time_window": [7.05, 10.0],
+      "_comment": "Hold position at human during hold phase"
+    },
+    {
+      "type": "always",
+      "predicate": "ObstacleAvoidance",
+      "weight": 6.0,
+      "modality": "PREFER",
+      "_comment": "SOFT: nudge path away from obstacle but penetration is acceptable (harmless ball)"
+    },
+    {
+      "type": "always",
+      "predicate": "VelocityLimit",
+      "weight": 8.0,
+      "modality": "REQUIRE"
+    },
+    {
+      "type": "always_during",
+      "predicate": "OrientationLimit",
+      "weight": 6.0,
+      "modality": "PREFER",
+      "time_window": [0.0, 7.0],
+      "_comment": "Prefer ball stays upright during carry but not hard-required"
+    },
+    {
+      "type": "always",
+      "predicate": "AngularVelocityLimit",
+      "weight": 5.0,
+      "modality": "REQUIRE"
+    }
+  ],
+  "bindings": {
+    "AtWaypoint.waypoint":   [0.30, 0.55, 0.30],
+    "AtWaypoint.tolerance":  0.04,
+
+    "HoldAtWaypoint.waypoint":        [0.30, 0.55, 0.30],
+    "HoldAtWaypoint.tolerance":       0.05,
+    "HoldAtWaypoint.speed_threshold": 0.05,
+
+    "ObstacleAvoidance.obstacle_position": [0.40, 0.30, 0.30],
+    "ObstacleAvoidance.safe_radius": 0.12,
+
+    "VelocityLimit.vmax": 0.8,
+
+    "OrientationLimit.q_ref":         [1.0, 0.0, 0.0, 0.0],
+    "OrientationLimit.max_angle_rad": 0.3,
+
+    "AngularVelocityLimit.omega_max": 1.5
+  }
+}
