@@ -335,28 +335,6 @@ def plot_2d_topdown(trace, best_cost, base="scene4_topdown"):
     ax.plot(pos[i2:, 0], pos[i2:, 1],
             color=C_CONT, lw=2.2, solid_capstyle="round", zorder=5, label="Continue")
 
-    # clearance annotation
-    d_min  = np.linalg.norm(pos - OBSTACLE, axis=1).min()
-    cl_cm  = (d_min - OBS_RAD) * 100.0
-    n_in   = int(np.sum(np.linalg.norm(pos - OBSTACLE, axis=1) < OBS_SAFE_RAD))
-    status = "✓ CLEAR" if n_in == 0 else f"✗ {n_in} pts inside"
-    ann_col = "#006600" if n_in == 0 else "#CC0000"
-    ax.text(0.02, 0.02,
-            f"Min clearance: {cl_cm:+.1f} cm  |  {status}",
-            transform=ax.transAxes, fontsize=8, color=ann_col,
-            va="bottom", ha="left",
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
-                      alpha=0.88, edgecolor="lightgrey"))
-
-    # Z annotation
-    z_min, z_max = pos[:,2].min(), pos[:,2].max()
-    ax.text(0.02, 0.10,
-            f"Z: [{z_min:.3f}, {z_max:.3f}] m  (const ≈ {START[2]:.2f} m)",
-            transform=ax.transAxes, fontsize=7.5, color="#444444",
-            va="bottom", ha="left",
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
-                      alpha=0.8, edgecolor="lightgrey"))
-
     # markers
     ax.scatter(START[0],    START[1],    s=80, c=C_START, zorder=10,
                edgecolors="black", linewidth=0.7, label="Start")

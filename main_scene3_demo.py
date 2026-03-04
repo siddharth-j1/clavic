@@ -375,15 +375,6 @@ def plot_2d_topdown(trace, best_cost, base="scene3_topdown"):
     ax.plot(pos[ip:, 0],   pos[ip:, 1],   color=C_POUR,  lw=2.2,
             solid_capstyle="round", zorder=5, label="Pour")
 
-    # ── Z-height as secondary info ──
-    # Check if Z stays constant — annotate min/max Z
-    z_min, z_max = pos[:, 2].min(), pos[:, 2].max()
-    ax.text(0.02, 0.02,
-            f"Z: [{z_min:.3f}, {z_max:.3f}] m  (should be ~{START[2]:.2f} = constant)",
-            transform=ax.transAxes, fontsize=7.5, color="#444444",
-            va="bottom", ha="left",
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8, edgecolor="lightgrey"))
-
     # ── start / goal markers ──
     ax.scatter(START[0], START[1], s=80, c=C_START, zorder=10,
                edgecolors="black", linewidth=0.7, label="Start")

@@ -1,24 +1,23 @@
 {
-  "_description": "Scene 5: Carry to goal — human body HARD avoidance + soft comfort zone",
+  "_description": "Scene 5b: Carry to goal in 2 s — human body HARD avoidance, comfort zone SOFT with reduced weight (intentional violation demo)",
   "_notes": [
-    "Single-phase carry task, 10 s.",
-    "Human is placed at [0.30, 0.30, 0.30].",
-    "Two-layer human constraint:",
-    "  HumanBodyExclusion   (REQUIRE): inner hard body radius 0.08 m — geometric guarantee",
-    "  HumanComfortDistance (PREFER, weight=15.0): comfort radius 0.19 m — soft, high-weight",
-    "  Per-axis stiffness reduction via Compiler (ramp from 3xr_comfort down to r_comfort)",
-    "Geometry:",
-    "  Start : [0.55, 0.00, 0.30]",
-    "  Goal  : [0.30, 0.55, 0.30]",
-    "  Human : [0.30, 0.30, 0.30]"
+    "Same geometry as Scene 5 but with T=2 s horizon.",
+    "Reduced comfort weight (4.0 vs 15.0 in Scene 5) so the optimizer trades",
+    "comfort-zone entry against reaching the goal faster.",
+    "Body exclusion is still HARD (geometric guarantee holds).",
+    "This demonstrates the difference between HARD (always respected) and",
+    "SOFT (can be violated under time/cost pressure).",
+    "Human : [0.30, 0.30, 0.30]",
+    "Start : [0.55, 0.00, 0.30]",
+    "Goal  : [0.30, 0.55, 0.30]"
   ],
-  "horizon_sec": 10.0,
+  "horizon_sec": 2.0,
   "phases": [
     {
       "label": "carry",
       "start": [0.55, 0.00, 0.30],
       "end":   [0.30, 0.55, 0.30],
-      "duration": 10.0,
+      "duration": 2.0,
       "start_quat": [1.0, 0.0, 0.0, 0.0],
       "end_quat":   [1.0, 0.0, 0.0, 0.0],
       "n_bfs_ori": 15
@@ -40,9 +39,9 @@
     {
       "type": "always",
       "predicate": "HumanComfortDistance",
-      "weight": 15.0,
+      "weight": 4.0,
       "modality": "PREFER",
-      "_comment": "Soft comfort zone — strong optimizer cost, no geometric enforcement"
+      "_comment": "Reduced weight — comfort zone likely violated to reach goal in 4 s"
     },
     {
       "type": "always",

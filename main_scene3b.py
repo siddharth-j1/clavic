@@ -349,27 +349,6 @@ def plot_2d_topdown(trace, best_cost, base="scene3b_topdown"):
     ax.plot(pos[ip:, 0],   pos[ip:, 1],   color=C_HOLD,  lw=2.2,
             solid_capstyle="round", zorder=5, label="Hold")
 
-    # Z-height annotation
-    z_min, z_max = pos[:, 2].min(), pos[:, 2].max()
-    ax.text(0.02, 0.02,
-            f"Z: [{z_min:.3f}, {z_max:.3f}] m  (should be ~{START[2]:.2f} = constant)",
-            transform=ax.transAxes, fontsize=7.5, color="#444444",
-            va="bottom", ha="left",
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
-                      alpha=0.8, edgecolor="lightgrey"))
-
-    # soft-avoidance annotation
-    d_min   = np.linalg.norm(pos - OBSTACLE, axis=1).min()
-    pen_cm  = (d_min - OBS_RAD) * 100.0
-    inside  = int(np.sum(np.linalg.norm(pos - OBSTACLE, axis=1) < OBS_SAFE_RAD))
-    pen_str = (f"Min clearance: {pen_cm:+.1f} cm  |  "
-               f"Pts inside zone: {inside}  (soft — OK)")
-    ax.text(0.02, 0.10, pen_str,
-            transform=ax.transAxes, fontsize=7.5, color="#774400",
-            va="bottom", ha="left",
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="#FFF8DC",
-                      alpha=0.85, edgecolor="#CCAA44"))
-
     # start / goal markers
     ax.scatter(START[0], START[1], s=80, c=C_START, zorder=10,
                edgecolors="black", linewidth=0.7, label="Start")
