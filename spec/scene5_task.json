@@ -1,0 +1,95 @@
+{
+  "_description": "Scene 5: Carry to goal — human standing at centre of workspace (hard body + soft comfort zone)",
+  "_notes": [
+    "Single-phase carry task, 10 s.",
+    "Human is placed at [0.40, 0.30, 0.30] — centre of the workspace path.",
+    "The robot must navigate around the human to reach the goal.",
+    "",
+    "Two-layer human constraint:",
+    "  HumanBodyExclusion  (REQUIRE, weight=500 via slack): hard body radius 0.08 m",
+    "    → robot MUST stay outside — enforced by HARD DMP repulsion + radial projector",
+    "  HumanComfortDistance (PREFER, weight=6.0): comfort zone radius 0.22 m",
+    "    → robot SHOULD stay outside — soft optimizer cost only, no geometric enforcement",
+    "",
+    "Geometry (identical to Scene 3/4):",
+    "  Start : [0.55, 0.00, 0.30]",
+    "  Goal  : [0.30, 0.55, 0.30]  — delivery point (NOT a human)",
+    "  Human : [0.40, 0.30, 0.30]  — same position as the laptop obstacle in Scene 3/4",
+    "",
+    "Constant orientation [1,0,0,0] throughout (upright carry, no pour).",
+    "No stiffness reduction at goal — goal is just a drop-off point."
+  ],
+  "horizon_sec": 10.0,
+  "phases": [
+    {
+      "label": "carry",
+      "start": [0.55, 0.00, 0.30],
+      "end":   [0.30, 0.55, 0.30],
+      "duration": 10.0,
+      "start_quat": [1.0, 0.0, 0.0, 0.0],
+      "end_quat":   [1.0, 0.0, 0.0, 0.0],
+      "n_bfs_ori": 15
+    }
+  ],
+  "clauses": [
+    {
+      "type": "eventually",
+      "predicate": "AtGoal",
+      "weight": 10.0,
+      "modality": "REQUIRE",
+      "_comment": "Reach goal position by end of task"
+    },
+    {
+      "type": "always",
+      "predicate": "HumanBodyExclusion",
+      "weight": 20.0,
+      "modality": "REQUIRE",
+      "_comment": "Hard body exclusion — robot must never enter body radius"
+    },
+    {
+      "type": "always",
+      "predicate": "HumanComfortDistance",
+      "weight": 6.0,
+      "modality": "PREFER",
+      "_comment": "Soft comfort zone — robot should stay outside comfort radius"
+    },
+    {
+      "type": "always",
+      "predicate": "VelocityLimit",
+      "weight": 8.0,
+      "modality": "REQUIRE",
+      "_comment": "Speed cap at 0.8 m/s"
+    },
+    {
+      "type": "always",
+      "predicate": "OrientationLimit",
+      "weight": 8.0,
+      "modality": "REQUIRE",
+      "_comment": "Keep end-effector upright — constant orientation throughout"
+    },
+    {
+      "type": "always",
+      "predicate": "AngularVelocityLimit",
+      "weight": 4.0,
+      "modality": "REQUIRE",
+      "_comment": "Limit angular velocity"
+    }
+  ],
+  "bindings": {
+    "AtGoal.waypoint":   [0.30, 0.55, 0.30],
+    "AtGoal.tolerance":  0.05,
+
+    "HumanBodyExclusion.human_position": [0.40, 0.30, 0.30],
+    "HumanBodyExclusion.body_radius":    0.08,
+
+    "HumanComfortDistance.human_position":     [0.40, 0.30, 0.30],
+    "HumanComfortDistance.preferred_distance": 0.22,
+
+    "VelocityLimit.vmax": 0.8,
+
+    "OrientationLimit.q_ref":        [1.0, 0.0, 0.0, 0.0],
+    "OrientationLimit.max_angle_rad": 0.15,
+
+    "AngularVelocityLimit.omega_max": 1.0
+  }
+}

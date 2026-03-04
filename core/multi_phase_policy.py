@@ -113,63 +113,79 @@ class MultiPhaseCertifiedPolicy:
     # ------------------------------------------------------------------ #
     def set_obstacles(self, obstacles):
         """
-        Register spherical obstacles with per-obstacle hard/soft control.
+        Register spherical obstacles with three-tier avoidance control.
 
         Parameters
         ----------
         obstacles : list of dict, each with keys:
             "center"      : array-like (3,)
             "radius"      : float              — safe clearance radius
-            "hard"        : bool   (optional)  — True (default): enable hard radial
-                                                 projector (GUARANTEED avoidance).
-                                                 False: soft only — only DMP repulsion,
-                                                 NO hard projection backstop.
+            "avoidance"   : str    (optional)  — one of "HARD", "SOFT", "NONE".
+                                                 Default: "HARD".
             "strength"    : float  (optional)  — DMP repulsion strength (default 0.05).
-                                                 Set to 0.0 to disable repulsion entirely.
             "infl_factor" : float  (optional)  — influence zone = radius * infl_factor
                                                  (default 2.5)
 
-        HARD mode  (hard=True, default):
+        Backward-compatible alias (deprecated — prefer "avoidance"):
+            "hard"        : bool   (optional)  — True → "HARD", False → "SOFT".
+                                                 Ignored if "avoidance" is also set.
+
+        Three tiers
+        -----------
+        HARD  (avoidance="HARD", default)
           Layer 1 — DMP repulsive forcing inside ODE: organically routes the
                     spring-damper attractor around obstacle. Smooth arc, no C-turn.
           Layer 2 — Hard radial projector post-rollout: backstop guarantee.
                     ∀t: ||p(t) − c|| ≥ radius  — by construction, unbreakable.
+          Use for: objects that must not be hit (fragile mug, human, wall).
 
-        SOFT mode  (hard=False):
-          Layer 1 — DMP repulsive forcing inside ODE only: path tries to avoid
-                    the obstacle but is NOT guaranteed to stay outside.
-                    The optimizer (PIBB) sees the soft ObstacleAvoidance cost
-                    and shapes theta toward avoiding paths — but no geometric
-                    backstop is applied. Use when obstacle penetration is
-                    acceptable (e.g. harmless object, or ball passing through).
+        SOFT  (avoidance="SOFT")
+          Layer 1 — DMP repulsive forcing inside ODE only: path PREFERS to arc
+                    around the obstacle but is NOT guaranteed to stay outside.
+                    No projector backstop. Optimizer (PIBB) sees soft cost.
+          Use for: preferred avoidance but occasional penetration is acceptable.
+
+        NONE  (avoidance="NONE")
+          No DMP repulsion, no projector — pure original spring-damper behavior.
+          The optimizer sees only the soft ObstacleAvoidance clause cost (if
+          registered in the task spec) but there is no geometric forcing at all.
+          The trajectory may freely penetrate the obstacle zone.
+          Use for: harmless objects where the ball can pass through freely
+                   (e.g. ball delivery through a gate or past a marker).
 
         Examples
         --------
         # Hard avoidance (guaranteed — mug-carry scene):
         policy.set_obstacles([
             {"center": [0.40, 0.30, 0.30], "radius": 0.12,
-             "hard": True, "strength": 0.05, "infl_factor": 2.0},
+             "avoidance": "HARD", "strength": 0.05, "infl_factor": 2.0},
         ])
 
-        # Soft avoidance (no guarantee — ball delivery scene):
+        # None avoidance (raw, may penetrate freely — ball delivery scene):
         policy.set_obstacles([
             {"center": [0.40, 0.30, 0.30], "radius": 0.12,
-             "hard": False, "strength": 0.05, "infl_factor": 2.0},
+             "avoidance": "NONE"},
         ])
         """
-        # ── Separate hard vs soft obstacles ────────────────────────────
-        hard_obs = [obs for obs in obstacles if obs.get("hard", True)]
-        soft_obs = [obs for obs in obstacles if not obs.get("hard", True)]
+        def _mode(obs):
+            """Resolve avoidance mode string, with backward-compat for 'hard' key."""
+            if "avoidance" in obs:
+                return obs["avoidance"].upper()
+            # Legacy: hard=True → HARD, hard=False → SOFT (NOT NONE)
+            if "hard" in obs:
+                return "HARD" if obs["hard"] else "SOFT"
+            return "HARD"   # default
 
-        # ── Hard projector: only for hard obstacles ─────────────────────
-        # If no hard obstacles registered, projector is empty (no-op).
+        # ── Hard projector: only for HARD obstacles ─────────────────────
+        hard_obs = [obs for obs in obstacles if _mode(obs) == "HARD"]
         self._projector = ObstacleProjector(hard_obs)
 
-        # ── DMP repulsive forcing: applied for ALL obstacles (hard + soft)
-        # Hard obstacles get DMP repulsion AND the projector backstop.
-        # Soft obstacles get DMP repulsion ONLY — no projector backstop.
+        # ── DMP repulsive forcing: HARD and SOFT obstacles only.
+        # NONE obstacles get neither projector nor repulsion — raw behavior.
         rep_obs = []
         for obs in obstacles:
+            if _mode(obs) == "NONE":
+                continue          # skip — no forcing at all for this obstacle
             c      = np.asarray(obs["center"], float)
             r      = float(obs["radius"])
             s      = float(obs.get("strength",    0.05))

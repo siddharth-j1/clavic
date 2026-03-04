@@ -187,6 +187,24 @@ def to_plot(p):
     return np.array(p)   # identity; matplotlib Z = world z = height
 
 
+def _obs_box_faces(cx, cy, cz, dx, dy, dz_bot, dz_top):
+    """Return 6 face lists for a box from (cx±dx, cy±dy, cz+dz_bot) to (cz+dz_top)."""
+    corners = np.array([
+        [cx-dx, cy-dy, cz+dz_bot], [cx+dx, cy-dy, cz+dz_bot],
+        [cx+dx, cy+dy, cz+dz_bot], [cx-dx, cy+dy, cz+dz_bot],
+        [cx-dx, cy-dy, cz+dz_top], [cx+dx, cy-dy, cz+dz_top],
+        [cx+dx, cy+dy, cz+dz_top], [cx-dx, cy+dy, cz+dz_top],
+    ])
+    return [
+        [corners[0], corners[1], corners[5], corners[4]],  # front
+        [corners[2], corners[3], corners[7], corners[6]],  # back
+        [corners[0], corners[3], corners[7], corners[4]],  # left
+        [corners[1], corners[2], corners[6], corners[5]],  # right
+        [corners[4], corners[5], corners[6], corners[7]],  # top
+        [corners[0], corners[1], corners[2], corners[3]],  # bottom
+    ]
+
+
 # ======================================================================
 #  PLOT 1 -- 3D workspace  (Franka frame: X=depth, Y=height, Z=table)
 # ======================================================================
@@ -197,24 +215,22 @@ def plot_3d_workspace(trace, best_cost, base="scene3_workspace"):
     fig = plt.figure(figsize=(9, 7))
     ax  = fig.add_subplot(111, projection="3d")
 
-    # ── obstacle cuboid (remap to plot frame) ──
+    # ── obstacle cuboid: bottom 20% solid black (laptop body), top 80% translucent ──
+    # The obstacle IS the laptop on the table.
+    # Total height = 2 × OBS_HZ.  Bottom 20% = solid dark base, top 80% = presence zone.
     cx, cy, cz = OBSTACLE
     dx, dy, dz = OBS_HX, OBS_HY, OBS_HZ
-    # world corners
-    corners_w = np.array([
-        [cx-dx, cy-dy, cz-dz], [cx+dx, cy-dy, cz-dz],
-        [cx+dx, cy+dy, cz-dz], [cx-dx, cy+dy, cz-dz],
-        [cx-dx, cy-dy, cz+dz], [cx+dx, cy-dy, cz+dz],
-        [cx+dx, cy+dy, cz+dz], [cx-dx, cy+dy, cz+dz],
-    ])
-    V = to_plot(corners_w)
-    faces = [
-        [V[0],V[1],V[5],V[4]], [V[2],V[3],V[7],V[6]],
-        [V[0],V[3],V[7],V[4]], [V[1],V[2],V[6],V[5]],
-        [V[4],V[5],V[6],V[7]], [V[0],V[1],V[2],V[3]],
-    ]
-    ax.add_collection3d(Poly3DCollection(faces, alpha=0.20, facecolor=C_OBS,
-                                         edgecolor="#666666", linewidth=0.5))
+    split_z = -dz + 2 * dz * 0.20   # offset from cz: bottom 20% boundary = cz + (-dz + 0.4*dz)
+    # Solid base layer (bottom 20% of obstacle height)
+    ax.add_collection3d(Poly3DCollection(
+        _obs_box_faces(cx, cy, cz, dx, dy, -dz, split_z),
+        alpha=0.90, facecolor="#1A1A1A", edgecolor="#000000", linewidth=0.7
+    ))
+    # Translucent upper layer (top 80%)
+    ax.add_collection3d(Poly3DCollection(
+        _obs_box_faces(cx, cy, cz, dx, dy, split_z, +dz),
+        alpha=0.20, facecolor=C_OBS, edgecolor="#666666", linewidth=0.5
+    ))
 
     # ── human proximity: vertical cylinder (axis along Z = height in plot) ──
     # Table plane is X-Y (matplotlib X=world_x, matplotlib Y=world_y).
@@ -301,9 +317,11 @@ def plot_3d_workspace(trace, best_cost, base="scene3_workspace"):
 
     # ── legend ──
     extra = [
-        mpatches.Patch(facecolor=C_OBS,   alpha=0.35, edgecolor="#666",
-                       label="Obstacle"),
-        mpatches.Patch(facecolor=C_HUMAN, alpha=0.25, edgecolor=C_HUMAN,
+        mpatches.Patch(facecolor="#1A1A1A", alpha=0.90, edgecolor="#000",
+                       label="Obstacle base (solid)"),
+        mpatches.Patch(facecolor=C_OBS,     alpha=0.30, edgecolor="#666",
+                       label="Obstacle upper (presence zone)"),
+        mpatches.Patch(facecolor=C_HUMAN,   alpha=0.25, edgecolor=C_HUMAN,
                        label=f"Human zone (r={r_cyl:.2f} m)"),
     ]
     handles, _ = ax.get_legend_handles_labels()
@@ -760,7 +778,7 @@ def main():
     optimizer = PIBB(theta=theta_init, sigma=sigma_init, beta=8.0, decay=0.99)
 
     N_SAMPLES = 30
-    N_UPDATES = 70
+    N_UPDATES = 120
     best_cost  = float("inf")
     best_theta = theta_init.copy()
 

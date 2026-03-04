@@ -1,36 +1,44 @@
 """
-Scene 3b: Ball Delivery to Human — Soft Obstacle Avoidance.
+Scene 3b: Ball Delivery to Human — Soft Obstacle Avoidance (weight-controlled).
 
 Same geometry as Scene 3 (start/goal/obstacle positions identical), but the
-object being carried is a harmless ball.  Since the ball can pass through the
-obstacle zone without damage, obstacle avoidance is SOFT (DMP repulsion only,
-no hard radial projector backstop).
+object being carried is a harmless ball.  Obstacle avoidance is a SOFT
+PREFER constraint: the optimizer has a weighted penalty for penetrating the
+obstacle zone, but NO geometric enforcement (no DMP repulsion, no projector).
 
-Key difference from Scene 3:
-  Scene 3  (mug carry):  hard=True  → DMP repulsion + radial projector
-                                       → GUARANTEED ||p(t)-c|| ≥ r  ∀t
-  Scene 3b (ball carry): hard=False → DMP repulsion ONLY
-                                       → path PREFERS to avoid obstacle
-                                       → no geometric guarantee
-                                       → projector is NOT applied
+The key idea: the weight parameter controls the avoidance tradeoff.
+  Low weight  → optimizer ignores obstacle, takes straight path through it
+  High weight → optimizer bends around obstacle to avoid the cost
 
-The DMP repulsive forcing still steers the path away (smooth arc, no C-turn),
-but the optimizer trades off avoidance against speed and goal-reaching.
-The ball may clip the obstacle zone if the optimizer finds it worthwhile.
+This is the same mechanism as the time-vs-avoidance tradeoff seen when
+reducing τ: when τ is small, time pressure outweighs the avoidance cost
+and the trajectory clips the obstacle zone. Here we control that directly
+via the obstacle weight.
+
+Three-tier avoidance comparison:
+  Scene 3  (avoidance="HARD"):  DMP repulsion + radial projector
+                                 → GUARANTEED ||p(t)-c|| ≥ r  ∀t
+  avoidance="SOFT"           :  DMP repulsion ONLY
+                                 → path PREFERS to avoid, no geometric guarantee
+  Scene 3b (avoidance="NONE"):  No repulsion, no projector
+                                 → soft optimizer cost only (PREFER clause)
+                                 → weight controls how hard the optimizer tries
+                                 → penetration acceptable — ball is harmless
 
 2-phase task:
-  Phase 1 (0-7s) : carry ball from start to human, try to avoid obstacle
+  Phase 1 (0-7s) : carry ball from start to human, obstacle cost = PREFER
   Phase 2 (7-10s): hold at human position (no pour — ball stays upright)
 
 CGMS guarantee K=Q^T Q > 0 is maintained throughout (same as Scene 3).
 Human-proximity stiffness reduction is active (same compiler cost).
 
 Plots (PNG only, no PDF saved):
-  1. scene3b_workspace.png  — 3D Franka FRS view
-  2. scene3b_topdown.png    — 2D X-Y top-down view
-  3. scene3b_stiffness.png  — Per-axis Kxx/Kyy/Kzz vs time
-  4. scene3b_orientation.png— Euler angles vs time
-  5. scene3b_kinematics.png — Position & velocity timeseries
+  1. scene3b_workspace.png      — 3D Franka FRS view (high-weight result)
+  2. scene3b_topdown.png        — 2D X-Y top-down view (high-weight result)
+  3. scene3b_comparison.png     — side-by-side low vs high obstacle weight
+  4. scene3b_stiffness.png      — Per-axis Kxx/Kyy/Kzz vs time
+  5. scene3b_orientation.png    — Euler angles vs time
+  6. scene3b_kinematics.png     — Position & velocity timeseries
 """
 
 import numpy as np
@@ -96,7 +104,7 @@ C_KZ     = "#55A868"
 C_BALL   = "#FF7F0E"    # orange accent for ball label
 
 # ── annotation ────────────────────────────────────────────────────────
-SCENE_LABEL = "Scene 3b — Ball Delivery (soft obstacle avoidance)"
+SCENE_LABEL = "Scene 3b — Ball Delivery (soft obstacle avoidance, weight-controlled)"
 
 
 # ── predicates ────────────────────────────────────────────────────────
@@ -155,12 +163,12 @@ def print_diagnostics(trace, best_cost):
 
     sep = "=" * 48
     print(f"\n{sep} SCENE 3b DIAGNOSTICS {sep}")
-    print(f"  Scene             : Ball delivery (SOFT obstacle avoidance)")
+    print(f"  Scene             : Ball delivery (soft PREFER, weight=4.0, avoidance=NONE)")
     print(f"  Best cost         : {best_cost:.4f}")
     print(f"  Goal reached      : {'YES' if reached else 'NO'}  t={t_reach:.2f} s")
     print(f"  Max speed         : {speed.max():.4f} m/s  (limit 0.8)")
-    print(f"  Obstacle clearance: {obs_cm:.1f} cm  (SOFT — no hard guarantee)")
-    print(f"  Pts inside obs    : {n_inside}  (SOFT: nonzero is acceptable)")
+    print(f"  Obstacle clearance: {obs_cm:.1f} cm  (PREFER soft — penetration acceptable)")
+    print(f"  Pts inside obs    : {n_inside}  (PREFER soft: nonzero acceptable)")
     print(f"  Hold pos drift    : {hold_drift*100:.1f} cm  (target < 5)")
     print(f"  tr(K) range       : [{trK.min():.0f}, {trK.max():.0f}] N/m")
     print(f"  tr(D) range       : [{trD.min():.1f}, {trD.max():.1f}] Ns/m")
@@ -186,6 +194,24 @@ def to_plot(p):
     return np.asarray(p)
 
 
+def _obs_box_faces(cx, cy, cz, dx, dy, dz_bot, dz_top):
+    """Return 6 face lists for a box layer from cz+dz_bot to cz+dz_top."""
+    corners = np.array([
+        [cx-dx, cy-dy, cz+dz_bot], [cx+dx, cy-dy, cz+dz_bot],
+        [cx+dx, cy+dy, cz+dz_bot], [cx-dx, cy+dy, cz+dz_bot],
+        [cx-dx, cy-dy, cz+dz_top], [cx+dx, cy-dy, cz+dz_top],
+        [cx+dx, cy+dy, cz+dz_top], [cx-dx, cy+dy, cz+dz_top],
+    ])
+    return [
+        [corners[0], corners[1], corners[5], corners[4]],
+        [corners[2], corners[3], corners[7], corners[6]],
+        [corners[0], corners[3], corners[7], corners[4]],
+        [corners[1], corners[2], corners[6], corners[5]],
+        [corners[4], corners[5], corners[6], corners[7]],
+        [corners[0], corners[1], corners[2], corners[3]],
+    ]
+
+
 # ======================================================================
 #  PLOT 1 -- 3D workspace
 # ======================================================================
@@ -196,23 +222,18 @@ def plot_3d_workspace(trace, best_cost, base="scene3b_workspace"):
     fig = plt.figure(figsize=(9, 7))
     ax  = fig.add_subplot(111, projection="3d")
 
-    # obstacle cuboid
+    # ── obstacle cuboid: bottom 20% solid black (laptop/obstacle base), top 80% translucent ──
     cx, cy, cz = OBSTACLE
     dx, dy, dz = OBS_HX, OBS_HY, OBS_HZ
-    corners_w = np.array([
-        [cx-dx, cy-dy, cz-dz], [cx+dx, cy-dy, cz-dz],
-        [cx+dx, cy+dy, cz-dz], [cx-dx, cy+dy, cz-dz],
-        [cx-dx, cy-dy, cz+dz], [cx+dx, cy-dy, cz+dz],
-        [cx+dx, cy+dy, cz+dz], [cx-dx, cy+dy, cz+dz],
-    ])
-    V = to_plot(corners_w)
-    faces = [
-        [V[0],V[1],V[5],V[4]], [V[2],V[3],V[7],V[6]],
-        [V[0],V[3],V[7],V[4]], [V[1],V[2],V[6],V[5]],
-        [V[4],V[5],V[6],V[7]], [V[0],V[1],V[2],V[3]],
-    ]
-    ax.add_collection3d(Poly3DCollection(faces, alpha=0.20, facecolor=C_OBS,
-                                         edgecolor="#666666", linewidth=0.5))
+    split_z = -dz + 2 * dz * 0.20   # cz-relative offset at 20% of total height
+    ax.add_collection3d(Poly3DCollection(
+        _obs_box_faces(cx, cy, cz, dx, dy, -dz, split_z),
+        alpha=0.90, facecolor="#1A1A1A", edgecolor="#000000", linewidth=0.7
+    ))
+    ax.add_collection3d(Poly3DCollection(
+        _obs_box_faces(cx, cy, cz, dx, dy, split_z, +dz),
+        alpha=0.20, facecolor=C_OBS, edgecolor="#666666", linewidth=0.5
+    ))
 
     # human proximity cylinder
     r_cyl   = HUMAN_PROX_RAD * 0.6
@@ -270,9 +291,11 @@ def plot_3d_workspace(trace, best_cost, base="scene3b_workspace"):
     ax.grid(True, alpha=0.28)
 
     extra = [
-        mpatches.Patch(facecolor=C_OBS,   alpha=0.35, edgecolor="#666",
-                       label="Obstacle (soft avoidance)"),
-        mpatches.Patch(facecolor=C_HUMAN, alpha=0.25, edgecolor=C_HUMAN,
+        mpatches.Patch(facecolor="#1A1A1A", alpha=0.90, edgecolor="#000",
+                       label="Obstacle base (solid)"),
+        mpatches.Patch(facecolor=C_OBS,     alpha=0.30, edgecolor="#666",
+                       label="Obstacle upper (soft avoidance)"),
+        mpatches.Patch(facecolor=C_HUMAN,   alpha=0.25, edgecolor=C_HUMAN,
                        label=f"Human zone (r={r_cyl:.2f} m)"),
     ]
     handles, _ = ax.get_legend_handles_labels()
@@ -575,9 +598,7 @@ def plot_kinematics(trace, best_cost, base="scene3b_kinematics"):
     plt.close()
 
 
-# ======================================================================
-#  CSV export
-# ======================================================================
+
 def save_trajectory_csv(trace, csv_path="scene3b_trajectory.csv"):
     import csv
     pos   = trace.position
@@ -616,22 +637,29 @@ def main():
     taskspec = load_taskspec_from_json("spec/scene3b_task.json")
     assert taskspec.phases is not None
 
+    # Override obstacle weight to 4.0 (soft PREFER — low weight means
+    # optimizer trades off avoidance freely; path may clip/penetrate obstacle)
+    OBS_WEIGHT = 4.0
+    for clause in taskspec.clauses:
+        if clause.predicate == "ObstacleAvoidance":
+            clause.weight = OBS_WEIGHT
+
     policy = MultiPhaseCertifiedPolicy(taskspec.phases, K0=300.0, D0=30.0)
 
-    # ── SOFT obstacle avoidance (hard=False) ──────────────────────────
-    # The ball is harmless — obstacle penetration is acceptable.
-    # DMP repulsive forcing steers path away (smooth arc preferred),
-    # but NO hard radial projector is applied.
-    # The hard projector is skipped because hard=False.
-    # Compare with Scene 3 which uses hard=True for the mug-carry task.
+    # avoidance="NONE": no DMP repulsion, no hard projector.
+    # Only the soft PREFER clause (weight=OBS_WEIGHT) in the objective nudges
+    # the optimizer. The weight controls how hard it tries to avoid —
+    # low weight → takes short path through obstacle,
+    # high weight → bends around. No geometric guarantee either way.
     policy.set_obstacles([
         {"center": OBSTACLE.tolist(), "radius": OBS_SAFE_RAD,
-         "hard": False,              # ← KEY: soft only, no projector backstop
-         "strength": 0.05, "infl_factor": 2.0},
+         "avoidance": "NONE"},
     ])
 
     theta_dim = policy.parameter_dimension()
-    print(f"Scene 3b: Ball delivery — SOFT obstacle avoidance (hard=False)")
+    print(f"Scene 3b: Ball delivery — soft PREFER obstacle avoidance (weight={OBS_WEIGHT})")
+    print(f"  avoidance=NONE: no DMP repulsion, no projector")
+    print(f"  Soft cost only: weight={OBS_WEIGHT} * max(0, -rho)  in objective")
     print(f"Multi-phase policy: {len(taskspec.phases)} phases, theta_dim={theta_dim}")
     print(f"  has_orientation: {policy.has_orientation}")
     for i, p in enumerate(taskspec.phases):
@@ -642,16 +670,6 @@ def main():
     compiler = Compiler(predicate_registry,
                         human_position=HUMAN_POS,
                         human_proximity_radius=HUMAN_PROX_RAD)
-
-    # ── Obstacle setup explanation ────────────────────────────────────
-    # Modular design:
-    #   hard=True  (Scene 3 mug):  DMP repulsion + radial projector backstop
-    #                               → GUARANTEED ||p(t)-c|| ≥ r  ∀t
-    #   hard=False (Scene 3b ball): DMP repulsion ONLY + soft PREFER clause
-    #                               → path tries to avoid, no geometric guarantee
-    # The ObstacleAvoidance clause in scene3b_task.json uses modality=PREFER
-    # (soft), so it contributes a weight=6 cost but NOT the SLACK_WEIGHT*s^2
-    # hard penalty. The optimizer trades off avoidance vs goal-reaching freely.
     objective_fn = compiler.compile(taskspec)
 
     trace0 = policy.rollout(np.zeros(theta_dim))
@@ -666,7 +684,6 @@ def main():
         sigma_sk=2.0,
         sigma_ori=1.5,
     )
-    # Dampen hold phase position noise (hold position at goal)
     hold_off = policy.offsets[1]
     hold_dim = policy.theta_dims[1]
     sigma_init[hold_off:hold_off + hold_dim] *= 0.05
@@ -674,19 +691,18 @@ def main():
     optimizer = PIBB(theta=theta_init, sigma=sigma_init, beta=8.0, decay=0.99)
 
     N_SAMPLES = 30
-    N_UPDATES = 70
+    N_UPDATES = 120
     best_cost  = float("inf")
     best_theta = theta_init.copy()
 
     print(f"\nPIBB: {N_UPDATES} updates x {N_SAMPLES} samples")
-    print(f"  Obstacle: SOFT repulsion only (hard=False) — no projector backstop")
+    print(f"  Obstacle: PREFER (soft), weight={OBS_WEIGHT}, avoidance=NONE")
     print(f"  K penalty: ramp [d < {HUMAN_RAMP_RAD} m], limit {K_AXIS_LIMIT:.0f} N/m at [d < {HUMAN_PROX_RAD} m]")
 
     for upd in range(N_UPDATES):
         samples = optimizer.sample(N_SAMPLES)
         costs   = np.array([objective_fn(policy.rollout(samples[i]))
                             for i in range(N_SAMPLES)])
-
         costs_s = np.clip(np.where(np.isfinite(costs), costs, 1e4), 0.0, 1e4)
         optimizer.update(samples, costs_s)
 
