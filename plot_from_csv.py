@@ -1,9 +1,9 @@
 """
-plot_from_csv.py — Regenerate all Scene 5 / 5b plots from a saved trajectory CSV.
+plot_from_csv.py — Regenerate all Exp 1 / 1b plots from a saved trajectory CSV.
 
 No training required. Just supply:
-  --csv     path to trajectory CSV  (default: scene5_trajectory.csv)
-  --scene   "5" or "5b"             (sets human/radius constants + output prefix)
+  --csv     path to trajectory CSV  (default: exp1_trajectory.csv)
+  --scene   "1" or "1b"             (sets human/radius constants + output prefix)
   --horizon horizon in seconds      (default: auto-detect from CSV row count)
 
 CSV format (produced by save_trajectory_csv):
@@ -13,8 +13,8 @@ CSV format (produced by save_trajectory_csv):
   d11..d33            — 3×3 damping matrix   (row-major)
 
 Usage:
-  python plot_from_csv.py --csv scene5_trajectory.csv  --scene 5
-  python plot_from_csv.py --csv scene5b_trajectory.csv --scene 5b
+  python plot_from_csv.py --csv exp1_trajectory.csv  --scene 5
+  python plot_from_csv.py --csv exp1b_trajectory.csv --scene 5b
   python plot_from_csv.py --csv my_traj.csv --scene 5 --horizon 10.0 --prefix my_run
 """
 
@@ -335,10 +335,10 @@ def plot_kinematics(t, pos, vel, K_arr, D_arr, label, base, horizon):
 # ── main ───────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="Regenerate scene plots from CSV.")
-    parser.add_argument("--csv",     default="scene5_trajectory.csv",
+    parser.add_argument("--csv",     default="exp1_trajectory.csv",
                         help="Path to trajectory CSV file")
     parser.add_argument("--scene",   default="5",
-                        help="Scene identifier: '5' or '5b' (sets output prefix)")
+                        help="Scene identifier: '1' or '1b' (sets output prefix)")
     parser.add_argument("--horizon", type=float, default=None,
                         help="Trajectory horizon in seconds (auto-detected if omitted)")
     parser.add_argument("--prefix",  default=None,

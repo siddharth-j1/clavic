@@ -40,7 +40,10 @@ class Compiler:
         soft_clauses = []
 
         for clause in taskspec.clauses:
-            if clause.modality == "REQUIRE":
+            # HARD and REQUIRE both use the slack-penalty path (Layer 3).
+            # The geometric guarantee for HARD (Layers 1+2) is handled by
+            # MultiPhaseCertifiedPolicy.setup_hard_obstacles_from_taskspec().
+            if clause.modality in ("HARD", "REQUIRE"):
                 hard_clauses.append(clause)
             else:
                 soft_clauses.append(clause)
@@ -49,8 +52,14 @@ class Compiler:
 
             total_cost = 0.0
 
-            # --- Hard clauses with slack relaxation ---
-            SLACK_WEIGHT = 500.0  # λ_s (tuneable)
+            # --- Hard/Require clauses with slack relaxation ---
+            # Fixed SLACK_WEIGHT for ALL HARD/REQUIRE clauses regardless of clause.weight.
+            # NOTE: clause.weight is intentionally NOT used here — it only applies to
+            # PREFER clauses (soft cost path below). This is by design so that all
+            # hard constraints are penalised equally strongly (500 × s²) and the tuned
+            # optimisation balance from the working experiments is preserved.
+            # The weight field on HARD/REQUIRE clauses is purely documentation/intent.
+            SLACK_WEIGHT = 500.0
 
             for clause in hard_clauses:
                 rho = self._evaluate_clause(trace, clause)

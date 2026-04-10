@@ -111,6 +111,26 @@ class MultiPhaseCertifiedPolicy:
         self._projector = ObstacleProjector()
 
     # ------------------------------------------------------------------ #
+    def setup_hard_obstacles_from_taskspec(self, taskspec):
+        """
+        Automatically wire Layers 1+2 (DMP repulsion + radial projector) for
+        all clauses declared with modality="HARD" in the JSON task spec.
+
+        Call this immediately after constructing the policy, before rollout.
+        The obstacle specs (center, radius, strength, infl_factor) are
+        extracted by json_parser and stored on taskspec.hard_obstacle_specs.
+
+        Example
+        -------
+            policy = MultiPhaseCertifiedPolicy(taskspec.phases)
+            policy.setup_hard_obstacles_from_taskspec(taskspec)
+            # No manual set_obstacles() needed.
+        """
+        specs = getattr(taskspec, "hard_obstacle_specs", [])
+        if specs:
+            self.set_obstacles(specs)
+
+    # ------------------------------------------------------------------ #
     def set_obstacles(self, obstacles):
         """
         Register spherical obstacles with three-tier avoidance control.

@@ -1,0 +1,226 @@
+{
+  "_description": "Scene 4: Carry \u2192 Hold-at-Waypoint (2s) \u2192 Continue to Goal, with hard obstacle avoidance",
+  "_notes": [
+    "3-phase task:",
+    "  Phase 1 (0-5s) : carry from start toward intermediate waypoint, avoid obstacle (HARD)",
+    "  Phase 2 (5-7s) : hold at intermediate waypoint \u2014 velocity must go to zero for 2s",
+    "  Phase 3 (7-11s): continue from waypoint to final goal",
+    "",
+    "Key features:",
+    "  - Hard obstacle avoidance: avoidance='HARD' in set_obstacles()",
+    "      \u2192 DMP repulsive forcing (steers ODE organically) + radial projector backstop",
+    "      \u2192 GUARANTEED ||p(t)-c|| >= r_safe \u2200t",
+    "  - Constant orientation [1,0,0,0] throughout all 3 phases (no tilt/pour)",
+    "  - Velocity must reach near-zero at waypoint during hold phase",
+    "  - Human proximity stiffness reduction active at final goal",
+    "",
+    "Geometry:",
+    "  Start    : [0.55, 0.00, 0.30]",
+    "  Waypoint : [0.20, 0.35, 0.30]  (midway, left of obstacle)",
+    "  Goal     : [0.30, 0.55, 0.30]  (same as Scene 3 \u2014 human position)",
+    "  Obstacle : [0.40, 0.30, 0.30]  (same as Scene 3)"
+  ],
+  "horizon_sec": 11.0,
+  "phases": [
+    {
+      "label": "carry",
+      "start": [
+        0.55,
+        0.0,
+        0.3
+      ],
+      "end": [
+        0.2,
+        0.35,
+        0.3
+      ],
+      "duration": 5.0,
+      "start_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "end_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "n_bfs_ori": 15
+    },
+    {
+      "label": "hold",
+      "start": [
+        0.2,
+        0.35,
+        0.3
+      ],
+      "end": [
+        0.2,
+        0.35,
+        0.3
+      ],
+      "duration": 2.0,
+      "n_bfs_traj": 11,
+      "n_bfs_slack": 3,
+      "start_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "end_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "n_bfs_ori": 7
+    },
+    {
+      "label": "continue",
+      "start": [
+        0.2,
+        0.35,
+        0.3
+      ],
+      "end": [
+        0.3,
+        0.55,
+        0.3
+      ],
+      "duration": 4.0,
+      "start_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "end_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "n_bfs_ori": 15
+    }
+  ],
+  "clauses": [
+    {
+      "type": "eventually_during",
+      "predicate": "AtWaypoint",
+      "weight": 10.0,
+      "modality": "REQUIRE",
+      "time_window": [
+        0.0,
+        5.0
+      ],
+      "_comment": "Reach intermediate waypoint within carry phase"
+    },
+    {
+      "type": "always_during",
+      "predicate": "HoldAtWaypoint",
+      "weight": 12.0,
+      "modality": "REQUIRE",
+      "time_window": [
+        5.1,
+        7.0
+      ],
+      "_comment": "Hold at waypoint with near-zero velocity during hold phase (2s)"
+    },
+    {
+      "type": "eventually_during",
+      "predicate": "AtGoal",
+      "weight": 10.0,
+      "modality": "REQUIRE",
+      "time_window": [
+        7.0,
+        11.0
+      ],
+      "_comment": "Reach final goal during continue phase"
+    },
+    {
+      "type": "always_during",
+      "predicate": "HoldAtGoal",
+      "weight": 8.0,
+      "modality": "REQUIRE",
+      "time_window": [
+        9.5,
+        11.0
+      ],
+      "_comment": "Hold at final goal near end of trajectory"
+    },
+    {
+      "type": "always",
+      "predicate": "ObstacleAvoidance",
+      "weight": 20.0,
+      "modality": "HARD",
+      "_comment": "Geometric guarantee: DMP repulsion + radial projector",
+      "hard_strength": 0.05,
+      "hard_infl_factor": 2.0
+    },
+    {
+      "type": "always",
+      "predicate": "VelocityLimit",
+      "weight": 8.0,
+      "modality": "REQUIRE"
+    },
+    {
+      "type": "always",
+      "predicate": "OrientationLimit",
+      "weight": 10.0,
+      "modality": "REQUIRE",
+      "_comment": "Keep orientation constant [1,0,0,0] throughout all phases"
+    },
+    {
+      "type": "always",
+      "predicate": "AngularVelocityLimit",
+      "weight": 5.0,
+      "modality": "REQUIRE"
+    }
+  ],
+  "bindings": {
+    "AtWaypoint.waypoint": [
+      0.2,
+      0.35,
+      0.3
+    ],
+    "AtWaypoint.tolerance": 0.04,
+    "HoldAtWaypoint.waypoint": [
+      0.2,
+      0.35,
+      0.3
+    ],
+    "HoldAtWaypoint.tolerance": 0.05,
+    "HoldAtWaypoint.speed_threshold": 0.05,
+    "AtGoal.waypoint": [
+      0.3,
+      0.55,
+      0.3
+    ],
+    "AtGoal.tolerance": 0.04,
+    "HoldAtGoal.waypoint": [
+      0.3,
+      0.55,
+      0.3
+    ],
+    "HoldAtGoal.tolerance": 0.05,
+    "HoldAtGoal.speed_threshold": 0.05,
+    "ObstacleAvoidance.obstacle_position": [
+      0.4,
+      0.3,
+      0.3
+    ],
+    "ObstacleAvoidance.safe_radius": 0.12,
+    "VelocityLimit.vmax": 0.8,
+    "OrientationLimit.q_ref": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "OrientationLimit.max_angle_rad": 0.15,
+    "AngularVelocityLimit.omega_max": 1.0
+  }
+}

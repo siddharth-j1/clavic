@@ -1,0 +1,189 @@
+{
+  "_description": "Scene 4: Carry \u2192 Hold-at-Waypoint (2s) \u2192 Continue to Goal, with hard obstacle avoidance",
+  "_notes": [
+    "3-phase task: carry, hold, continue.",
+    "Hard obstacle avoidance (HARD) for safety.",
+    "Velocity and orientation constraints (REQUIRE).",
+    "Hold at waypoint (REQUIRE)."
+  ],
+  "horizon_sec": 11.0,
+  "phases": [
+    {
+      "label": "carry",
+      "start": [
+        0.55,
+        0.0,
+        0.3
+      ],
+      "end": [
+        0.2,
+        0.35,
+        0.3
+      ],
+      "duration": 5.0,
+      "start_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "end_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "n_bfs_ori": 15
+    },
+    {
+      "label": "hold",
+      "start": [
+        0.2,
+        0.35,
+        0.3
+      ],
+      "end": [
+        0.2,
+        0.35,
+        0.3
+      ],
+      "duration": 2.0,
+      "n_bfs_traj": 11,
+      "n_bfs_slack": 3,
+      "start_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "end_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "n_bfs_ori": 7
+    },
+    {
+      "label": "continue",
+      "start": [
+        0.2,
+        0.35,
+        0.3
+      ],
+      "end": [
+        0.3,
+        0.55,
+        0.3
+      ],
+      "duration": 4.0,
+      "start_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "end_quat": [
+        1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "n_bfs_ori": 15
+    }
+  ],
+  "clauses": [
+    {
+      "type": "eventually_during",
+      "predicate": "AtWaypoint",
+      "weight": 10.0,
+      "modality": "REQUIRE",
+      "time_window": [
+        0.0,
+        5.0
+      ]
+    },
+    {
+      "type": "always_during",
+      "predicate": "HoldAtWaypoint",
+      "weight": 10.0,
+      "modality": "REQUIRE",
+      "time_window": [
+        5.0,
+        7.0
+      ]
+    },
+    {
+      "type": "eventually_during",
+      "predicate": "AtGoal",
+      "weight": 10.0,
+      "modality": "REQUIRE",
+      "time_window": [
+        7.0,
+        11.0
+      ]
+    },
+    {
+      "type": "always",
+      "predicate": "ObstacleAvoidance",
+      "weight": 10.0,
+      "modality": "HARD",
+      "hard_strength": 0.05,
+      "hard_infl_factor": 2.0
+    },
+    {
+      "type": "always",
+      "predicate": "VelocityLimit",
+      "weight": 10.0,
+      "modality": "REQUIRE"
+    },
+    {
+      "type": "always",
+      "predicate": "OrientationLimit",
+      "weight": 10.0,
+      "modality": "REQUIRE"
+    },
+    {
+      "type": "always",
+      "predicate": "AngularVelocityLimit",
+      "weight": 10.0,
+      "modality": "REQUIRE"
+    }
+  ],
+  "bindings": {
+    "AtWaypoint.waypoint": [
+      0.2,
+      0.35,
+      0.3
+    ],
+    "AtWaypoint.tolerance": 0.03,
+    "HoldAtWaypoint.waypoint": [
+      0.2,
+      0.35,
+      0.3
+    ],
+    "HoldAtWaypoint.tolerance": 0.03,
+    "HoldAtWaypoint.speed_threshold": 0.05,
+    "AtGoal.waypoint": [
+      0.3,
+      0.55,
+      0.3
+    ],
+    "AtGoal.tolerance": 0.03,
+    "ObstacleAvoidance.obstacle_position": [
+      0.4,
+      0.3,
+      0.3
+    ],
+    "ObstacleAvoidance.safe_radius": 0.1,
+    "VelocityLimit.vmax": 0.5,
+    "OrientationLimit.q_ref": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "OrientationLimit.max_angle_rad": 0.3,
+    "AngularVelocityLimit.omega_max": 1.0
+  }
+}

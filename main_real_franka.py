@@ -20,7 +20,6 @@ from spec.compiler import Compiler
 from spec.json_parser import load_taskspec_from_json
 from core.multi_phase_policy import MultiPhaseCertifiedPolicy
 from optimization.optimizer import PIBB
-from experiment_checkpoint_warmstart import save_checkpoint
 from scipy.interpolate import CubicSpline
 from scipy.ndimage import gaussian_filter1d
 
@@ -422,7 +421,6 @@ def main():
     print("Optimization Complete.\n")
 
     trace_final = policy.rollout(best_theta)
-    save_checkpoint(best_theta, taskspec.horizon_sec, best_cost, trace_final)
     print_diagnostics(trace_final, best_cost)
     
     # Generate 3 separate plots

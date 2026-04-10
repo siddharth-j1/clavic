@@ -1,0 +1,183 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║         MATHEMATICAL_ARCHITECTURE.md: CITATION REQUIREMENTS SUMMARY        ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+┌─── SECTION A: DYNAMIC MOVEMENT PRIMITIVES ──────────────────────────────┐
+│                                                                           │
+│  ODE: τ² ÿ + τ d ẏ + k(y - g) = f_learned + f_repulse                   │
+│                                                                           │
+│  Citations needed:                                                        │
+│  ├─ Ijspeert et al. (2002) ICRA         [foundational DMP]              │
+│  ├─ Schaal et al. (2003)                [RBF parameterization]          │
+│  └─ YOUR CGMS Paper (2025)              [implementation + extensions]    │
+│                                                                           │
+│  Status: ✗ NEEDS CITATIONS                                              │
+└───────────────────────────────────────────────────────────────────────────┘
+
+┌─── SECTION B: OBSTACLE AVOIDANCE ─────────────────────────────────────────┐
+│                                                                           │
+│  Repulsion: f_repulse = s · k_dmp · α(d) · n                            │
+│  Taper:     α(d) = [(r_infl - d) / (r_infl - r)]³                       │
+│                                                                           │
+│  Citations needed:                                                        │
+│  ├─ Khatib (1986) IJRR                  [potential field concept]       │
+│  ├─ Hoffmann et al. (2009) ICRA         [DMP obstacle steering]         │
+│  └─ YOUR CGMS Paper (2025)              [cubic taper modification]      │
+│                                                                           │
+│  Status: ✗ NEEDS CITATIONS                                              │
+└───────────────────────────────────────────────────────────────────────────┘
+
+┌─── SECTION C: CERTIFIED IMPEDANCE GAINS (CGMS) ────────────────────────────┐
+│                                                                           │
+│  Positive-Definite:  K(t) = Q(t)ᵀ Q(t)                                  │
+│  Cholesky ODE:       Q̇ = α Q + 0.5 Q⁻ᵀ B                                │
+│                                                                           │
+│  Citations needed:                                                        │
+│  ├─ Hogan (1985) JDSMC                  [impedance control theory]      │
+│  ├─ Khatib (1987) IEEE JRA              [operational space]             │
+│  ├─ Boyd & Vandenberghe (2004)          [Cholesky decomposition]        │
+│  ├─ Kronander & Billard (2016) IJRR     [Lyapunov stability]            │
+│  └─ YOUR CGMS Paper (2025)              [Cholesky ODE + certified K]    │
+│                                                                           │
+│  SUBSECTION: Orientation in SO(3)                                        │
+│  ├─ ⚠️  CRITICAL FIX: Change +k to -k in spring term                     │
+│  ├─ Ude et al. (2014) ICRA              [SO(3) log-space DMP]           │
+│  └─ Status: ✗ WRONG SIGN + NO CITATION                                  │
+│                                                                           │
+│  Overall Status: ✗ NEEDS 4 CITATIONS + 1 CRITICAL SIGN FIX              │
+└───────────────────────────────────────────────────────────────────────────┘
+
+┌─── SECTION D: TEMPORAL LOGIC SPECIFICATION ─────────────────────────────────┐
+│                                                                           │
+│  Syntax: φ := ⊤ | f(y_t)<c | ¬φ | ⋀ᵥ φᵢ | ◇φ | □φ | φ U ψ             │
+│                                                                           │
+│  Citations needed:                                                        │
+│  ├─ Pnueli (1977) JACM                  [LTL foundational]              │
+│  ├─ Kress-Gazit et al. (2009) ICRA      [TL for robotics]               │
+│  └─ YOUR wTLTL Paper (2020s)            [weighted temporal logic]       │
+│                                                                           │
+│  Status: ✗ NEEDS 2 FOUNDATIONAL CITATIONS                               │
+└───────────────────────────────────────────────────────────────────────────┘
+
+┌─── SECTION E: THREE-LAYER SAFETY ARCHITECTURE ───────────────────────────────┐
+│                                                                           │
+│  ┌─────────────────┐                                                    │
+│  │  Layer 1: DMP   │  Soft steering via repulsive forcing               │
+│  │  Repulsion      │  → Hoffmann et al. (2009)                          │
+│  └─────────────────┘                                                    │
+│           ↓                                                              │
+│  ┌─────────────────┐                                                    │
+│  │  Layer 2: CGMS  │  Certified positive-definite K by construction     │
+│  │  Certified K    │  → YOUR CGMS Paper (2025)                          │
+│  └─────────────────┘                                                    │
+│           ↓                                                              │
+│  ┌─────────────────┐                                                    │
+│  │  Layer 3:       │  Hard geometric guarantee via radial projection    │
+│  │  Hard Projector │  → YOUR CGMS Paper (2025)                          │
+│  └─────────────────┘                                                    │
+│                                                                           │
+│  Status: ✗ NEEDS INTEGRATIVE PARAGRAPH CITING CGMS                      │
+└───────────────────────────────────────────────────────────────────────────┘
+
+┌─── SECTION F: PIBB OPTIMIZATION ──────────────────────────────────────────┐
+│                                                                           │
+│  Algorithm:  w_i = exp(-β J_i) / Z                                      │
+│  Update:     μ_new = Σ w_i θ_i                                          │
+│                                                                           │
+│  Citations needed:                                                        │
+│  ├─ Theodorou et al. (2010) JMLR        [PI² algorithm]                 │
+│  └─ Vlassis & Toussaint (2009)          [PIBB probabilistic variant]    │
+│                                                                           │
+│  Status: ✗ NEEDS 2 CITATIONS                                            │
+└───────────────────────────────────────────────────────────────────────────┘
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                         CITATION CHECKLIST (15 TOTAL)                      ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+FOUNDATIONAL PAPERS (must cite):
+  [ ] 1. Ijspeert et al. (2002) ICRA          — DMP ODE formulation
+  [ ] 2. Schaal et al. (2003)                 — RBF basis functions
+  [ ] 3. Khatib (1986) IJRR                   — Artificial potential fields
+  [ ] 4. Hoffmann et al. (2009) ICRA          — DMP obstacle avoidance
+  [ ] 5. Hogan (1985) JDSMC                   — Impedance control
+  [ ] 6. Khatib (1987) IEEE JRA               — Operational space
+  [ ] 7. Boyd & Vandenberghe (2004)           — Cholesky decomposition
+  [ ] 8. Pnueli (1977) JACM                   — Temporal logic (LTL)
+  [ ] 9. Theodorou et al. (2010) JMLR         — PI² optimization
+
+RECENT PAPERS (must cite):
+  [ ] 10. Kronander & Billard (2016) IJRR     — Lyapunov stable impedance
+  [ ] 11. Kress-Gazit et al. (2009) ICRA      — TL for robotics
+  [ ] 12. Vlassis & Toussaint (2009)          — PIBB variant
+  [ ] 13. Ude et al. (2014) ICRA              — Orientation DMP in SO(3)
+
+YOUR PAPERS (novel contributions):
+  [ ] 14. CGMS (2025) arXiv:2511.16330        — Certified gains + 3-layer arch
+  [ ] 15. wTLTL (2020s)                       — Weighted temporal logic
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                           CRITICAL ISSUES (3 FOUND)                        ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+❌ ISSUE 1: WRONG SIGN IN ORIENTATION DMP
+   Location: instruction.txt line 238 (Section C, Orientation subsection)
+   Current:  τ² ω̇ = k e_g(t) - τ d ω(t) + ...    [POSITIVE spring term]
+   Correct:  τ² ω̇ = -k e_g(t) - τ d ω(t) + ...   [NEGATIVE spring term]
+   Fix:      Change + to - AND add citation to Ude et al. (2014)
+
+❌ ISSUE 2: MISSING CITE FORMAT
+   Location: instruction.txt line 177
+   Current:  "(Kronander and Billard) as hard constraints"
+   Fix:      Change to "(Kronander and Billard~\cite{KB2016}) as hard constraints"
+
+❌ ISSUE 3: RED TEXT TODO MARKER
+   Location: instruction.txt line 238
+   Current:  \textcolor{red}{Need to verify and cite this}
+   Fix:      Replace with proper LaTeX citation
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                        REQUIRED EDITS BY LOCATION                         ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+Section A (DMP):
+  Edit Location: After introducing DMP ODE equation
+  Add: Ijspeert2002, Schaal2003, CGMS citations
+
+Section B (Obstacle Avoidance):
+  Edit Location: Before "The Repulsive Force Equation"
+  Add: Khatib1986, Hoffmann2009, CGMS citations
+
+Section C (Certified Impedance):
+  Edit Location: Before "The Solution: Cholesky Decomposition"
+  Add: Hogan1985, Khatib1987, Boyd2004, KB2016, CGMS citations
+
+Section C (Orientation DMP) - CRITICAL:
+  Edit Location: Line ~238 in orientation subsection
+  Fix: Change +k to -k AND cite Ude2014
+
+Section D (Temporal Logic):
+  Edit Location: After "What is Temporal Logic?"
+  Add: Pnueli1977, KG2009, wTLTL citations
+
+Section E (Three-Layer Architecture):
+  Edit Location: After architecture diagram
+  Add: Integrative paragraph citing all three layers
+
+Section F (PIBB):
+  Edit Location: After "What is PIBB?"
+  Add: Theodorou2010, VT2009 citations
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                              TIMELINE                                      ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+Step 1: Read README_CITATIONS.md (executive summary)
+Step 2: Read ACTION_PLAN_ADD_CITATIONS.md (specific edits)
+Step 3: Apply 9 citation edits (15 minutes)
+Step 4: Fix orientation DMP sign error (5 minutes)
+Step 5: Create paper_references.bib (10 minutes)
+Step 6: LaTeX compile and verify (10 minutes)
+
+Total Time: ~1 hour before submission
+

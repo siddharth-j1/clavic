@@ -6,7 +6,7 @@ Instructions for you to follow :
    so i can also see that what is going on.
 
 
-
+Context:
 we  were doing, can you once again fo to out current workspace code to have a idea of below impletation:
 we are using two base papers:
 1. cgms : paper - https://arxiv.org/html/2511.16330v1
@@ -15,203 +15,251 @@ we are using two base papers:
  code : https://github.com/siddharthjainsid1411/wltl
 
  and using above as base we are working on below draft whose latex code is below:
+\documentclass[letterpaper, 10 pt, conference]{ieeeconf}
 
-\title{CLAVIC: Certified Language-guided Variable Impedance Control with Temporal Logic Preferences
- \\
-% \author{Giovanni Franzese$^{*\dagger}$, Anna M\'esz\'aros$^\dagger$, Luka Peternel, and Jens Kober}
-%{\footnotesize \textsuperscript{*}Note: Sub-titles are not captured in Xplore and should not be used}
-% \thanks{This research is funded by ARTPARK, DRDO.}
-% \thanks{The authors are with Human-interactive Robotics Lab, Cyber Physical Systems(e-mail: ravipr@iisc.ac.in).}
-% \thanks{$^*$Corresponding Author $^\dagger$These authors contributed equally to this work.} 
-%\thanks{This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be accessible}
-% \thanks{1. \textbf{This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be accessible.}}
-%\thanks{Identify applicable funding agency here. If none, delete this.}
+\IEEEoverridecommandlockouts
+\overrideIEEEmargins
+
+% MATH
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{mathtools}
+\let\proof\relax
+\let\endproof\relax
+\usepackage{amsthm}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\newtheorem{assumption}{Assumption}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+% TABLES
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage[table]{xcolor}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{makecell}
+\usepackage{caption}
+\usepackage{multicol}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}m{#1}}
+
+% GRAPHICS
+\usepackage{graphicx}
+\usepackage{epsfig}
+
+% ALGORITHMS
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\usepackage{cuted}
+\usepackage{capt-of} 
+\usepackage[font=footnotesize]{caption}  
+
+
+% PREAMBLE ADDITIONS 
+\usepackage{array,booktabs}
+\usepackage[table]{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}m{#1}}
+
+% SYMBOLS
+\usepackage{pifont}
+\newcommand{\cmark}{\ding{51}}
+\newcommand{\xmark}{\ding{55}}
+\newcommand{\warn}{{\fontencoding{U}\fontfamily{futs}\selectfont\char49\relax}}
+
+% MISC
+\usepackage{cite}
+% \usepackage[colorlinks=true, citecolor=cyan]{hyperref}
+
+
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    citecolor=cyan
 }
+\usepackage{orcidlink}
+
+
+\title{ \LARGE \bf
+Safe \& Semantically-Aware Trajectory Adaptation for Robot Manipulation via Natural Language
+}
+\author{
+Shreyas Kumar$^{\orcidlink{0009-0003-2869-4913}}$, Siddharth Jain$^{\orcidlink{0000-0002-9058-434X}}$, and
+Ravi Prakash$^{\orcidlink{0000-0002-9058-434X}}$ \\
+\url{shr-eyas.github.io/S2TA}
+\thanks{All authors are with Human-Interactive Robotics Lab, IISc Bangalore.}
+\thanks{This work was supported in part by ARTPARK, IISc Bengaluru}
+\thanks{Corresponding author: {\tt\small shreyaskumar@iisc.ac.in}}
+}
+
+
+
+\begin{document}
 \maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
+\vspace*{-150mm} 
+
+\begin{strip}
+\centering
+\includegraphics[width=\textwidth]{Shreyas/images/traj-adaptation-framework.png}
+\captionof{figure}{A structured scene summary containing entity poses and semantic labels is provided to both the language parser and the deterministic compiler. The language parser uses this information to generate symbolic bindings between predicates and scene entities, while the compiler uses the same information to ground the specification into numerical constraints and cost terms.}
+\label{fig:placeholder}
+\end{strip}
 
 
-
-
+\begin{abstract}
+Robotic manipulation in human environments requires satisfying geometric safety constraints together with high-level semantic requirements involving temporal ordering, timing, and object-dependent motion preferences expressed in natural language. We present a framework for language-conditioned trajectory synthesis that compiles semantic task specifications into certified motion and impedance policies. Natural language instructions are translated into a typed representation expressed in weighted temporal logic over a structured predicate library. A deterministic compiler generates hard constraints enforced by construction through a feasible-manifold parameterization that guarantees collision avoidance, actuator feasibility, and impedance stability, together with a robustness-based objective capturing soft semantic preferences and temporal requirements. The resulting optimization synthesizes full six-degree-of-freedom trajectories and time-varying impedance schedules, enabling principled trade-offs between competing objectives while preserving hard guarantees. Hardware experiments demonstrate language-driven semantic reasoning, timing adaptation, and certified physically consistent manipulation behaviors.
+\end{abstract}
 
 \section{INTRODUCTION}
 
 \section{PRELIMINARIES}
 
 
-\section{METHODOLOGY}
+\clearpage
+\section{METHOD}
 
-\subsection{Problem Formulation and Notation}
+\subsection{Problem Formulation}
 
-We consider a finite-horizon robotic manipulation task executed over continuous time
-$t \in [0,\tau]$, where $\tau > 0$ denotes the task duration.
-The objective is to generate a feasible end-effector motion and
-time-varying impedance policy that satisfy hard physical constraints while
-optimizing user-specified task preferences.
+We consider a finite-horizon robotic manipulation task executed over continuous time $t \in [0,\tau]$, where $\tau > 0$ denotes the task duration. The objective is to generate a feasible end-effector trajectory and time-varying impedance policy such that hard physical constraints are satisfied at all times, while user preferences derived from semantic task specifications are optimized.
 
-\textbf{End-effector pose.}
-The end-effector pose is defined as
+\subsubsection{Pose representation}
+
+The end-effector pose was defined as
+\[
+x(t)=\big(p(t),q(t)\big),
+\]
+where $p(t)\in\mathbb{R}^3$ denoted Cartesian position and $q(t)\in\mathbb{S}^3$
+was a unit quaternion representing orientation with $\|q(t)\|=1$.
+Quaternion multiplication was denoted by $\otimes$ and inverse by $q^{-1}$. For two orientations $q_1$ and $q_2$, the relative quaternion was
+\[
+q_e = q_1 \otimes q_2^{-1}.
+\]
+The geodesic angular distance was defined as
+\[
+d_q(q_1,q_2) =
+2\arccos\!\left(\left|(q_e)_w\right|\right)\in[0,\pi],
+\]
+where $(\cdot)_w$ denoted the scalar component. The absolute value resolved the
+quaternion sign ambiguity.
+
+To obtain a singularity-free orientation error in the tangent space of $SO(3)$, we also used the quaternion log map:
+\[
+q_e(t) = q_d(t)^{-1}\otimes q(t),\qquad
+e_R(t)=2\log\!\big(q_e(t)\big)\in\mathbb{R}^3,
+\]
+and enforced the shortest geodesic by flipping the quaternion sign when needed. If $\langle q(t),q_d(t)\rangle < 0$, then $q(t)\leftarrow -q(t)$.
+The angular distance was $\|e_R(t)\|$.
+
+
+All constraints and costs are evaluated on a uniform grid $\{t_k\}_{k=0}^{N}$ with step size $\Delta t = 1$\text{ ms}, such that $t_0=0$ and $t_N=\tau$.
+
+
+
+\subsubsection{Variable Impedance Control}
+
+The robot tracked the reference trajectory using a time-varying operational-space
+impedance controller. Let $\tilde{x}(t)$ denote the task-space tracking error.
+The closed-loop dynamics were modeled as
 \begin{equation}
-x(t) = \big(p(t), q(t)\big),
+H\ddot{\tilde{x}}(t)+D(t)\dot{\tilde{x}}(t)+K(t)\tilde{x}(t)=f_e(t),
 \end{equation}
-where $p(t) \in \mathbb{R}^3$ denotes Cartesian position and
-$q(t) \in \mathbb{S}^3$ is a unit quaternion representing orientation,
-with $\|q(t)\| = 1$.
+where $H\succ 0$ was the inertia matrix, $K(t)\succ 0$ the stiffness matrix,
+$D(t)\succ 0$ the damping matrix, and $f_e(t)$ bounded disturbances.
 
-Quaternion multiplication is denoted by $\otimes$ and the inverse by
-$q^{-1}$.
+To ensure stability of time-varying impedance schedules, we enforced Lyapunov-style
+matrix inequalities (Kronander and Billard) as hard constraints:
+\begin{align}
+\alpha H - D(t) &\preceq 0, \label{eq:kb1}\\
+\dot{K}(t) + \alpha \dot{D}(t) - 2\alpha K(t) &\preceq 0,\label{eq:kb2}
+\end{align}
+for some constant $\alpha>0$. These conditions are treated as hard constraints and enforced by construction using the certified manifold formulation introduced in \cite{CGMS}.
 
-\textbf{Quaternion distance.}
-For two orientations $q_1$ and $q_2$, we define the relative quaternion
+
+
+\subsubsection{Policy parameters}
+
+The rollout-generating policy parameters are
 \begin{equation}
-q_e = q_1 \otimes q_2^{-1},
-\end{equation}
-and the geodesic angular distance
-\begin{equation}
-d_q(q_1, q_2) =
-2 \arccos\!\left( \big| (q_e)_w \big| \right) \in [0,\pi],
-\end{equation}
-where $(\cdot)_w$ denotes the scalar component.
-The absolute value resolves the quaternion sign ambiguity.
-
-\textbf{Time discretization.}
-Constraints and costs are evaluated on a uniform grid
-$\{t_k\}_{k=0}^{N}$ with $t_0 = 0$ and $t_N = \tau$.
-
-\textbf{Policy parameters.}
-A rollout-generating policy is parameterized as
-\begin{equation}
-\pi_{\Theta}, \quad
 \Theta = (\theta, \psi),
 \end{equation}
-where $\theta$ parameterizes the desired pose trajectory and
-$\psi$ parameterizes controller quantities such as impedance gains.
+where $\theta$ parameterizes trajectory primitives and
+$\psi$ parameterizes impedance gains and slack variables.
 
-\subsection{Pose Motion Primitive Representation}
+% ----------------------------------------------------
 
-We represent the desired reference trajectory as
+\subsection{Trajectory Parameterization}
+
+The desired reference trajectory is generated as
 \begin{equation}
-x_d(t;\theta) =
-\big(p_d(t;\theta_p), q_d(t;\theta_q)\big),
+x_d(t;\theta)
+=
+\big(
+p_d(t;\theta_p),
+q_d(t;\theta_q)
+\big).
 \end{equation}
-with parameter vector $\theta = (\theta_p,\theta_q)$.
 
-The framework is agnostic to the specific primitive representation
-(e.g., splines or dynamic movement primitives) provided that
+\subsubsection{Canonical phase variable}
 
-\begin{enumerate}
-\item the trajectory is reproducible from $\theta$, and
-\item the trajectory supports temporal scaling.
-\end{enumerate}
-
-\textbf{Time scaling.}
-We separate trajectory shape from duration by introducing the normalized phase
+Trajectory shape is separated from duration using a normalized
+phase variable
 \begin{equation}
 s = \frac{t}{\tau}.
 \end{equation}
-Thus, the same parameter vector $\theta$ can be executed under different
-durations by modifying $\tau$.
 
-\subsection{Variable Impedance Execution Model}
+\subsubsection{Translational motion primitive}
 
-The robot tracks the reference trajectory using a time-varying
-operational-space impedance controller.
+Translational trajectories are parameterized using Dynamic
+Movement Primitives (DMPs) identical to those used in
+\cite{CGMS}:
 
-Let $\tilde{x}(t)$ denote the task-space tracking error.
-The closed-loop dynamics are modeled as
-\begin{equation}
-H \ddot{\tilde{x}}(t)
-+ D(t)\dot{\tilde{x}}(t)
-+ K(t)\tilde{x}(t)
-= f_e(t),
-\end{equation}
-where
-
-\begin{itemize}
-\item $H \succ 0$ is the inertia matrix,
-\item $K(t) \succ 0$ is the stiffness matrix,
-\item $D(t) \succ 0$ is the damping matrix,
-\item $f_e(t)$ represents bounded disturbances.
-\end{itemize}
-
-To ensure stability of time-varying impedance schedules,
-we enforce Lyapunov-style matrix inequalities
 \begin{align}
-\alpha H - D(t) &\preceq 0, \\
-\dot{K}(t) + \alpha \dot{D}(t)
-- 2 \alpha K(t) &\preceq 0,
-\end{align}
-for some constant $\alpha > 0$.
-
-These conditions are treated as hard constraints and enforced
-by construction.
-
-\subsection{Predicate Library Over Pose and Dynamics}
-
-We define a predicate library $\Pi$ evaluated over the rollout trace
-\begin{equation}
-\mathcal{T}
+\tau^2 m \ddot{p}(t)
 =
-\left\{
-p(t), q(t), K(t), D(t)
-\right\}_{t \in [0,\tau]}.
-\end{equation}
-
-Each predicate produces a scalar robustness margin used for
-optimization.
-
-\subsubsection{Position and Pose Predicates}
-
-Examples include:
-
-\begin{align}
-p(t) &\in \mathcal{R}, \\
-\|p(t) - \bar{p}\| &\le \epsilon_p, \\
-d_q\big(q(t), \bar{q}\big) &\le \epsilon_q, \\
-d_O(p(t)) &\ge d_{\min}, \\
-\|\dot{p}(t)\| &\le v_{\max}.
+k(g - p(t))
+-
+\tau d \dot{p}(t)
++
+\gamma(t) f_{\text{pos}}(s),
 \end{align}
 
-\subsubsection{Orientation Constraints}
+where $g$ is the goal position and
+$f_{\text{pos}}(s)$ is an RBF forcing term parameterized by
+$\theta_p$.
 
-Orientation predicates are uniformly defined using quaternion distance.
+\subsubsection{Orientation motion primitive in log space}
+\textcolor{red}{Need to verify and cite this}
+Orientation dynamics are defined in the tangent space of $SO(3)$:
 
-\textbf{Orientation waypoint}
-\begin{equation}
-d_q\big(q(t), \bar{q}\big) \le \epsilon_q.
-\end{equation}
+\begin{align}
+\tau^2 m \dot{\omega}(t)
+=
+k e_g(t)
+-
+\tau d \omega(t)
++
+\gamma(t) f_{\text{ori}}(s),
+\\
+\dot{q}(t)
+=
+\frac{1}{2}\Omega(\omega(t))q(t),
+\end{align}
 
-\textbf{Orientation limit}
-\begin{equation}
-d_q\big(q(t), q_{\mathrm{ref}}\big)
-\le \theta_{\max}.
-\end{equation}
+where $\omega(t)$ is angular velocity and
+$e_g(t)$ is log-map orientation error.
 
-\textbf{Pose waypoint}
-\begin{equation}
-\|p(t)-\bar{p}\| \le \epsilon_p
-\;\wedge\;
-d_q(q(t),\bar{q}) \le \epsilon_q.
-\end{equation}
+% ----------------------------------------------------
 
-\subsection{Typed Specification: Hard and Soft Constraints}
+\subsection{Language Interface and Task Specification}
 
-Each predicate template is assigned an enforcement type:
-
-\begin{itemize}
-\item \texttt{HARD\_ONLY:}
-collision avoidance, actuator limits, impedance stability.
-\item \texttt{SOFT\_ALLOWED:}
-preferences such as comfort zones or region preferences.
-\item \texttt{SOFT\_ONLY:}
-style costs (e.g., smoothness).
-\end{itemize}
-
-Hard constraints are never relaxed during optimization,
-whereas soft constraints may be violated with penalty.
-
-\subsection{Language Interface and Deterministic Compilation}
-
-User instructions are converted into a structured task specification
+User instructions are converted into a structured task specification \texttt{TaskSpec}
 \begin{equation}
 \mathcal{S}
 =
@@ -230,112 +278,492 @@ where
 A deterministic compiler validates syntax, enforces typing rules,
 and constructs both hard constraints and rollout costs.
 
-\subsection{Hard Constraint Enforcement via Slack-Manifold Sampling}
+\subsubsection{Overview}
 
-Let $z$ denote rollout-dependent quantities determined by policy parameters.
-Hard constraints are expressed as
-\begin{equation}
-g_i(z,t_k) \le 0.
-\end{equation}
-
-We introduce slack variables $s_{i,k}$ such that
-\begin{equation}
-g_i(z,t_k) + s_{i,k}^2 = 0.
-\end{equation}
-
-This guarantees $g_i \le 0$ without penalties or projections.
-
-Matrix inequalities are enforced using matrix slack variables.
-For example,
-\begin{equation}
-\alpha H - D(t_k)
-=
-- S_D(t_k) S_D^\top(t_k).
-\end{equation}
-
-Positive definiteness of stiffness is enforced via
-\begin{equation}
-K(t_k) = Q^\top(t_k) Q(t_k).
-\end{equation}
-
-All unconstrained coordinates are collected into
-\begin{equation}
-\xi = (\theta, \omega),
-\end{equation}
-and mapped to feasible controller parameters through
-\begin{equation}
-(\theta, \psi) = F(\xi).
-\end{equation}
-
-Sampling $\xi$ therefore produces only feasible rollouts.
-
-\subsection{Soft Preferences via Temporal Logic Robustness}
-
-Given temporal logic specification $\varphi$,
-we compute rollout robustness
-$\rho(\mathcal{T},\varphi)$.
-A smooth approximation $\rho_e$ is used during optimization.
-
-The logic cost is defined as
-\begin{equation}
-J_{\mathrm{TL}}(\mathcal{T})
-=
-\max
-\left(
-0,\,
--\rho_e(\mathcal{T},\varphi)
-\right).
-\end{equation}
-
-\subsection{Total Objective Function}
-
-The complete rollout objective is
-\begin{equation}
-J(\mathcal{T})
-=
-\lambda_{\mathrm{TL}} J_{\mathrm{TL}}(\mathcal{T})
-+
-\sum_j \lambda_j J_j(\mathcal{T}),
-\end{equation}
-where $J_j$ are auxiliary costs such as smoothness and effort.
-
-Hard constraints do not appear in the objective,
-since feasibility is enforced by construction.
-
-\subsection{Optimization on the Feasible Manifold}
-
-We optimize over $\xi$ using sampling-based policy improvement
-(PI$^2$/PIBB).
-
-Samples are drawn from
-\begin{equation}
-\xi^{(m)} \sim \mathcal{N}(\mu,\Sigma).
-\end{equation}
-
-For each sample:
-
+Natural language instructions were converted into a structured task specification \texttt{TaskSpec} using a large language model (LLM). The \texttt{TaskSpec} was not executed directly. Instead, a deterministic compiler (i) validated and type-checked the \texttt{TaskSpec},
+(ii) injected mandatory hard constraints, and (iii) compiled the specification into:
+\textcolor{red}{Need to reframe the following.}
 \begin{enumerate}
-\item Construct feasible parameters via $F(\xi^{(m)})$,
-\item Execute rollout to obtain trace $\mathcal{T}^{(m)}$,
-\item Evaluate cost $J(\mathcal{T}^{(m)})$,
-\item Update $(\mu,\Sigma)$ using importance weighting.
+\item \emph{hard constraints} are enforced by construction (via 3 layer architecture mentioned in subsequent section)
+\item \emph{required constraints} are heavily weighted and not under LLM/user-control
+\item {user preference} is encoded using temporal-logic robustness objective 
+\item rollout costs
 \end{enumerate}
 
-Because feasibility is guaranteed, exploration never violates
-hard constraints.
 
-\subsection{Outputs and Guarantees}
+\subsubsection{Scene summary provided to the LLM}
 
-At convergence, the method produces:
+The LLM received a structured scene summary consisting of tuples
+\begin{equation}
+\{(\text{id}_{i},\; \text{name}_{i},\; p_i,\; q_i)\}_{i=1}^{N_{\text{obj}}},
+\end{equation}
+i.e., object id, object name, position, and orientation quaternion.
 
+
+\subsubsection{Predicate library}
+
+Predicates are evaluated over rollout trace
+\begin{equation}
+\mathcal{T}
+=
+\{p(t), q(t), \dot{p}(t), \omega(t), K(t), D(t)\}.
+\end{equation}
+
+Predicate families include:
+
+\begin{align}
+\text{AtPose:} &\quad
+\|p(t)-\bar p\|\le \epsilon_p
+\wedge
+d_q(q(t),\bar q)\le \epsilon_q
+\\
+\text{InRegion:} &\quad p(t)\in \mathcal{R}
+\\
+\text{Clearance:} &\quad d(p(t))\ge d_{\min}
+\\
+\text{TiltLimit:} &\quad d_q(q(t),q_{\text{ref}})\le \theta_{\max}
+\\
+\text{RateLimit:} &\quad
+\|\dot p(t)\|\le v_{\max},
+\|\omega(t)\|\le \omega_{\max}
+\end{align}
+
+\textcolor{red}{Impedance feasibility predicates are also included? Human-aware VIC?}
+
+\subsubsection{Temporal logic operators (wTLTL)}
+
+Task semantics were expressed using weighted truncated linear temporal logic (wTLTL) \cite{wTLTL}.
+We supported the operator set used in \cite{wTLTL}, restricted to operators required in manipulation tasks:
+Always ($\square$), Eventually ($\lozenge$), Until ($U$), Then/Sequence ($T$), and Implication ($\Rightarrow$).
+The wTLTL syntax followed \cite{wTLTL}:
+\begin{equation}
+\begin{aligned}
+\varphi :=\;& \top \mid f(y_t)<c \mid \neg\varphi \mid \bigwedge\nolimits_w \varphi_i \\
+            & \mid \bigvee\nolimits_w \psi_i
+            \mid \lozenge\varphi \mid \square\varphi \\
+            & \mid \varphi U \psi \mid \varphi T \psi \mid \varphi \Rightarrow \psi .
+\end{aligned}
+\end{equation}
+
+
+
+\subsubsection{Hard constraints and user preferences (typed enforcement)}
+
+Each predicate instance produced by the LLM was assigned an enforcement type by deterministic rules:
 \begin{itemize}
-\item reference trajectory $x_d(t)$,
-\item time-varying impedance gains $K(t)$ and $D(t)$.
+\item {Hard constraint:} enforced by construction via the certified Convex Projection; never violated in rollouts.
+\item {User preference:} included in the wTLTL objective; may be violated when necessary to satisfy hard constraints or user preference.
 \end{itemize}
+The compiler maps language modality (e.g., ``must'', ``prefer'')
+to enforcement type using deterministic rules.
 
-The resulting policy satisfies all hard constraints by construction,
-while soft preferences are optimized according to weighted
-temporal logic robustness.
+[NOTE: we are using 3 constraint - hard for guaranteed satisfaction, require - necessary but dont depend on user it uses slack penalization, prefer - soft constraint uses weighted penalization similar to wltl ]
 
+
+
+% ----------------------------------------------------
+% \subsection{Compilation to Optimization: Hard Constraints, Robustness Cost, and Policy Search}
+
+% \subsubsection{Hard constraint enforcement via slack-manifold mapping}
+
+% Hard constraints were expressed on the time grid as inequalities
+% \begin{equation}
+% g_i(z,t_k)\le 0,\qquad k=0,\dots,N,
+% \end{equation}
+% where $z$ collected rollout-dependent quantities induced by the policy parameters.
+
+% \paragraph{Scalar inequalities.}
+% Each scalar inequality was enforced by introducing a slack variable $s_{i,k}\in\mathbb{R}$:
+% \begin{equation}
+% g_i(z,t_k) + s_{i,k}^2 = 0.
+% \end{equation}
+% This implied $g_i(z,t_k)\le 0$ without penalties, projections, or filtering.
+
+% \paragraph{Positive definiteness constraints.}
+% We ensured $K(t_k)\succ 0$ and $D(t_k)\succ 0$ by parameterizing them using matrix factors:
+% \begin{equation}
+% K(t_k) = Q_K^\top(t_k)\,Q_K(t_k),\qquad
+% D(t_k) = Q_D^\top(t_k)\,Q_D(t_k),
+% \end{equation}
+% where $Q_K(t_k)$ and $Q_D(t_k)$ were free parameters (included in $\psi$).
+
+% \paragraph{Lyapunov matrix inequalities (Kronander--Billard).}
+% The inequalities \eqref{eq:kb1}--\eqref{eq:kb2} were enforced using matrix slacks:
+% \begin{align}
+% \alpha H - D(t_k) &= -S_1(t_k)S_1^\top(t_k), \label{eq:slack_kb1}\\
+% \dot{K}(t_k) + \alpha\dot{D}(t_k) - 2\alpha K(t_k) &= -S_2(t_k)S_2^\top(t_k), \label{eq:slack_kb2}
+% \end{align}
+% where $S_1(t_k)$ and $S_2(t_k)$ were free matrix slack variables.
+% Time derivatives were computed using the grid finite difference (Sec. Problem Formulation).
+
+% This slack-manifold enforcement followed the certified feasible-manifold sampling approach in \cite{CGMS};
+% we referred to \cite{CGMS} for certification proofs and theoretical guarantees.
+
+% \paragraph{Full hard constraint set.}
+% The compiler enforced the following as hard constraints (pointwise in time on the grid):
+% \begin{enumerate}
+% \item Clearance: $d(p(t_k)) \ge d_{\min}$.
+% \item Workspace bounds: $p_{\min}\le p(t_k)\le p_{\max}$.
+% \item Rate limits: $\|\dot{p}(t_k)\|\le v_{\max}$ and $\|\omega(t_k)\|\le \omega_{\max}$.
+% \item Gain bounds (if specified as hard): $K_{\min}\preceq K(t_k)\preceq K_{\max}$ and $D_{\min}\preceq D(t_k)\preceq D_{\max}$.
+% \item Positive definiteness: $K(t_k)\succ 0$, $D(t_k)\succ 0$ via factorization.
+% \item Stability: \eqref{eq:kb1}--\eqref{eq:kb2} enforced via \eqref{eq:slack_kb1}--\eqref{eq:slack_kb2}.
+% \item Additional hard semantic constraints when typed as hard (e.g., $\text{TiltLimit}(q_{\text{ref}},\theta_{\max})$).
+% \end{enumerate}
+
+
+% \subsubsection{wTLTL robustness and preference cost}
+
+% Given a rollout trace $\mathcal{T}$ and a preference specification $\varphi$, we computed wTLTL robustness
+% $\rho_w(\mathcal{T},\varphi)$ as in \cite{wTLTL}. For the base cases:
+% \begin{align}
+% \rho_w(\mathcal{T},\top) &= \rho^{w}_{\max},\\
+% \rho_w(\mathcal{T},f(y_t)<c) &= c - f(y_t),\\
+% \rho_w(\mathcal{T},\neg\varphi) &= -\rho_w(\mathcal{T},\varphi).
+% \end{align}
+
+% For weighted conjunction and disjunction, we used the aggregation functions from \cite{wTLTL}.
+% Let $x=[\rho(\mathcal{T},\varphi_1),\dots,\rho(\mathcal{T},\varphi_N)]$ and $w\in\mathbb{R}^N_{>0}$
+% with normalized weights $\bar{w}_i = w_i/\sum_j w_j$. Then:
+% \begin{align}
+% \rho_w\!\left(\mathcal{T},\bigwedge\nolimits_w \varphi_i\right) &=
+% \otimes_{\wedge}(w,x)
+% =
+% \min_{i=1:N}
+% \left\{
+% \left(
+% \left(\frac{1}{2}-\bar{w}_i\right)\mathrm{Sign}(x_i)+\frac{1}{2}
+% \right)\,x_i
+% \right\},\\
+% \rho_w\!\left(\mathcal{T},\bigvee\nolimits_w \psi_i\right) &=
+% \oplus_{\vee}(w,x)
+% =
+% -\otimes_{\wedge}(w,-x).
+% \end{align}
+
+% For temporal operators, we used the TLTL quantitative semantics referenced by \cite{wTLTL}. In particular:
+% \begin{align}
+% \rho(\mathcal{T},\square\varphi) &= \min_{k\in\{0,\dots,N\}} \rho(\mathcal{T}_{t_k:\tau},\varphi),\\
+% \rho(\mathcal{T},\lozenge\varphi) &= \max_{k\in\{0,\dots,N\}} \rho(\mathcal{T}_{t_k:\tau},\varphi),
+% \end{align}
+% and the corresponding standard robustness recursions for $U$, $T$, and $\Rightarrow$ as defined in the TLTL semantics used by \cite{wTLTL}.
+
+% During optimization, we used a smooth approximation $\rho_e$ of robustness to avoid nondifferentiability of $\min/\max$.
+
+
+% The preference loss was defined as a hinge on robustness:
+% \begin{equation}
+% J_{\mathrm{TL}}(\mathcal{T})
+% =
+% \max\left(0,\,-\rho_e(\mathcal{T},\varphi)\right).
+% \end{equation}
+% This penalized only violations and remained zero for satisfied preferences.
+
+
+
+
+\subsection{VIC stability via CGMS}
+
+
+% ----------------------------------------------------
+
+\subsection{Temporal Logic Robustness}
+
+Given rollout trace $\mathcal{T}$ and specification $\varphi$,
+robustness is computed recursively as in \cite{wTLTL}.
+
+For predicates:
+\begin{align}
+\rho(\top) &= \rho_{\max} \\
+\rho(f(y)<c) &= c - f(y)
+\end{align}
+
+Negation:
+\begin{equation}
+\rho(\neg \varphi) = -\rho(\varphi)
+\end{equation}
+
+Weighted conjunction:
+\begin{equation}
+\rho\!\left(\bigwedge_w \varphi_i\right)
+=
+\otimes^\wedge(w,\rho_i)
+\end{equation}
+
+Weighted disjunction:
+\begin{equation}
+\rho\!\left(\bigvee_w \varphi_i\right)
+=
+\oplus^\vee(w,\rho_i)
+\end{equation}
+
+Temporal operators:
+
+\begin{align}
+\rho(\square \varphi)
+&=
+\min_{t'\in[t,\tau]}
+\rho(\varphi,t')
+\\
+\rho(\lozenge \varphi)
+&=
+\max_{t'\in[t,\tau]}
+\rho(\varphi,t')
+\end{align}
+
+Positive robustness implies satisfaction, negative implies violation.
+
+A smooth approximation $\rho_e$ is used during optimization. [For exact formulation refer wltl]
+
+
+
+\subsection{Soft Geometric Routing via Repulsive Forcing}
+
+While the baseline dynamic movement primitives parameterize the spatial shape of the motion, relying fully on post-optimization clipping to prevent collisions results in discontinuous velocity profiles. To induce natural, smooth obstacle avoidance, we added the translational motion primitive with a continuous repulsive force injected directly into the ODE when in proximity of obstacle that needs to be avoided.
+
+We approximate environmental obstacles using convex bounding geometries. Let $c \in \mathbb{R}^3$ denote the geometric center of an obstacle with a clearance boundary $r$, and let $r_{\mathrm{infl}} > r$ define an extended spatial influence radius. We modify the translational DMP as:
+\begin{align}
+\tau^2 m \ddot{p}(t) &= -k(p(t) - g) - \tau d \dot{p}(t) \nonumber \\
+&\quad + \gamma(t) f_{\text{pos}}(s) + f_{\mathrm{rep}}(p(t)),
+\end{align}
+where $f_{\mathrm{rep}}(p)$ acts as a virtual force pushing the trajectory tangentially away from the convex boundary. 
+
+To ensure continuous second derivatives (yielding dynamically feasible, smooth accelerations) while strictly bounding the repulsive magnitude, we define a cubic taper function $\alpha: \mathbb{R}_{\ge 0} \rightarrow [0,1]$. For a distance $d_c(p) = \|p - c\|$, the taper is:
+\begin{equation}
+\alpha(d_c) = 
+\begin{cases} 
+\left( \frac{r_{\mathrm{infl}} - d_c}{r_{\mathrm{infl}} - r} \right)^3 & \text{if } d_c < r_{\mathrm{infl}}, \\
+0 & \text{otherwise}.
+\end{cases}
+\end{equation}
+The force is applied along the outward unit normal $n(p) = \frac{p - c}{\|p - c\|}$ and scaled commensurately with the nominal primitive spring constant $k$:
+\begin{equation}
+f_{\mathrm{rep}}(p) = s_{\mathrm{obs}} \, k \, \alpha(d_c(p)) \, n(p),
+\end{equation}
+where $s_{\mathrm{obs}} > 0$ determines the repulsion strength. By integrating this term inside the ODE, the policy naturally bends the generated path around convex obstacles while the goal-attractor remains continuously active.
+
+\subsection{Hard Geometric Safety via Convex Projection}
+
+In safety-critical tasks (such as avoiding human) require absolute, unconditional geometric guarantees that cannot afford to be violated under any sampling conditions. 
+
+To provide this hard backstop, we employ a geometric projection onto the safe set. After the modified ODE is integrated to produce the discretized trajectory points $p_k = p(t_k)$, we look for points that penetrate the obstacle's convex boundary. For a bounding geometry with center $c$ and safety radius $r$, points violating the constraint ($\|p_k - c\| < r$) are subjected to a hard radial projection as follows:
+\begin{equation}
+p'_k = c + r \frac{p_k - c}{\|p_k - c\|}.
+\end{equation}
+This operation help in mapping the unfeasible point orthogonally onto the nearest point on the surface of the convex hull providing guaranteed avoidance. 
+
+Because the repulsive forcing discussed above already bends the trajectory away from the obstacle during the integration phase, this hard projector is only used if violation detected. Consequently, this approach strictly guarantees unconditional geometric safety.
+
+
+
+% ----------------------------------------------------
+
+\subsection{Total Rollout Objective and Regularization}
+
+While hard geometric safety and impedance stability are guaranteed by construction (as detailed in above Sections), the specific task execution and semantic user preferences are guided by a composite cost function. For a given rollout trace $\mathcal{T}$ generated by the policy parameters $\Theta$, the total objective evaluated by the deterministic compiler is:
+\begin{equation}
+    J(\mathcal{T}) = J_{\mathrm{TL}} + J_{\mathrm{slack}}
+    + J_{\mathrm{gain\_reg}} + J_{K\text{-ceil}}
+    + J_{\mathrm{damp}} + J_{K\text{-human}}.
+\end{equation}
+The optimizer seeks to minimize this unconstrained objective, where each constituent term balances a specific aspect of the manipulation task.
+
+\paragraph{Temporal-Logic Robustness Costs}
+Language instructions mapped to the \texttt{PREFER} modality represent soft user preferences (e.g., human comfort zones). These contribute a weighted hinge loss based on the wTLTL robustness metric $\rho_i(\mathcal{T})$:
+\begin{equation}
+    J_{\mathrm{TL}} = \sum_{i\in\mathrm{PREFER}}
+        w_i\,\max\!\bigl(0,\,-\rho_i(\mathcal{T})\bigr).
+\end{equation}
+Conversely, instructions mapped to \texttt{REQUIRE} or \texttt{HARD} modalities (which govern constraints that must not be violated, such as avoid human body or strict speed limits) are strictly enforced via a heavy quadratic slack penalty with a scaling weight ($\lambda_s = 500$):
+\begin{equation}
+    J_{\mathrm{slack}} = \lambda_s
+        \sum_{i\in\{\mathrm{HARD,\,REQ}\}}
+        \max\!\bigl(0,\,-\rho_i(\mathcal{T})\bigr)^2.
+\end{equation}
+
+\paragraph{Gain-Parameter Regularization}
+To prevent the learned radial basis function (RBF) weights from drifting into excessively large magnitudes during exploration, we penalize values outside an admissible clip range $[-\bar{w},\bar{w}]$ (with $\bar{w}=15$):
+\begin{align}
+    J_{\mathrm{gain\_reg}} 
+    &= \frac{1}{N_{\mathrm{rbf}}}
+      \sum_j \max\!\bigl(0,\,|w^K_j|-\bar{w}\bigr)^2 \nonumber \\
+    &\quad + \frac{1}{N_{\mathrm{rbf}}}
+      \sum_j \max\!\bigl(0,\,|w^D_j|-\bar{w}\bigr)^2,
+\end{align}
+where $w^K_j$ and $w^D_j$ are the raw, pre-clip weights for the stiffness and damping schedules, respectively, and $N_{\mathrm{rbf}}$ is the number of basis functions.
+
+\paragraph{Operational Impedance Bounds}
+Although the Cholesky parameterization guarantees positive definiteness ($K \succ 0$), we must also bound the absolute magnitude of the gains for hardware safety. A safety-net penalty activates if the trace stiffness exceeds a maximum ceiling $K_{\max}=3000\,\mathrm{N/m}$:
+\begin{equation}
+    J_{K\text{-ceil}}
+    = \frac{1}{T}\sum_{k=1}^{T}
+      \left(
+        \frac{\max\!\bigl(0,\,\mathrm{tr}(K_k)-K_{\max}\bigr)}{K_{\max}}
+      \right)^{\!2}.
+\end{equation}
+Similarly, because sampling-based optimisers frequently reduce damping to achieve faster motions, we explicitly enforce a hardware-safe lower bound $D_{\min}=30\,\mathrm{Ns/m}$ on the trace damping $\mathrm{tr}(D)$:
+\begin{equation}
+    J_{\mathrm{damp}}
+    = \frac{2}{T}\sum_{k=1}^{T}
+      \left(
+        \frac{\max\!\bigl(0,\,D_{\min}-\mathrm{tr}(D_k)\bigr)}{D_{\min}}
+      \right)^{\!2}.
+\end{equation}
+
+\paragraph{Human-Proximity Stiffness Shaping}
+A key advantage of variable impedance control is the ability to yield during physical human-robot interaction. When a human operator is detected in the workspace, a distance-weighted penalty naturally encourages the policy to reduce the per-axis stiffness to a safe threshold ($K^h = 100\,\mathrm{N/m}$) inside a proximity radius $r_h$. The penalty scales smoothly over a ramp zone $[r_h,\,3r_h]$:
+\begin{equation}
+    w_h(d_k)
+    = \mathrm{clip}\!\left(
+        \frac{3r_h - d_k}{2r_h},\;0,\;1
+      \right),
+\end{equation}
+where $d_k = \|p(t_k) - p_{\mathrm{human}}\|_2$ is the distance to the human at time $t_k$. The proximity cost is then evaluated over the subset of timesteps $\mathcal{I}=\{k : d_k < 3r_h\}$ inside the interaction zone:
+\begin{equation}
+    J_{K\text{-human}}
+    = \frac{8}{|\mathcal{I}|}
+      \sum_{k\in\mathcal{I}}
+      w_h(d_k)\cdot
+      \frac{1}{3}\sum_{i=1}^{3}
+      \left(
+        \frac{\max(0,\,K_{ii}(t_k)-K^h)}{K^h}
+      \right)^{\!2}.
+\end{equation}
+Because this cost is aggressively optimized by the PIBB algorithm, the resulting trajectories automatically exhibit compliant, low-stiffness behavior when navigating near human operators, while maintaining high precision and stiffness in free space.
+
+
+
+
+
+
+
+
+\subsection{Optimization via PIBB}
+
+We optimized the policy parameters using Policy Improvement with Black-Box Optimization (PIBB), following the motion-primitive policy search approach in \cite{wTLTL}.
+Exploration was performed in unconstrained coordinates $\xi$ (trajectory parameters, gain factors, and slack variables), sampled from a Gaussian:
+\begin{equation}
+\xi^{(m)} \sim \mathcal{N}(\mu,\Sigma),\qquad m=1,\dots,M_{\mathrm{roll}}.
+\end{equation}
+Each sample $\xi^{(m)}$ was mapped through the certified manifold construction to a feasible policy
+$\Theta^{(m)}=(\theta^{(m)},\psi^{(m)})$, guaranteeing satisfaction of hard constraints.
+
+For each rollout, we executed the policy to obtain a trace $\mathcal{T}^{(m)}$ and evaluated $J^{(m)}=J(\mathcal{T}^{(m)})$.
+PIBB importance weights were computed as
+\begin{equation}
+w^{(m)} =
+\frac{\exp(-J^{(m)}/\lambda)}
+{\sum_{j=1}^{M_{\mathrm{roll}}}\exp(-J^{(j)}/\lambda)},
+\end{equation}
+and the mean parameters were updated via weighted averaging.
+
+
+
+
+\clearpage
+
+
+\section{EXPERIMENTS}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 1/compare_topdown.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 1/compare_workspace.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 1/compare_stiffness.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 2/scene4_workspace.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 2/scene4_topdown.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 2/scene4_stiffness.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 1/scene5_stiffness.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 3/scene3_workspace.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 3/scene3_stiffness.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 3/scene3_orientation.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 3/scene3b_workspace.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 3/scene3b_stiffness.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+\begin{figure}
+    \centering
+    \includegraphics[width=0.5\linewidth]{Shreyas/images/exp 3/scene3b_orientation.png}
+    \caption{Caption}
+    \label{fig:placeholder}
+\end{figure}
+
+
+
+\section{CONCLUSION}
+\bibliographystyle{IEEEtran}
+\bibliography{Shreyas/references}
+
+\end{document}
 
 
