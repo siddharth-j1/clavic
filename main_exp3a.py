@@ -43,9 +43,9 @@ sns.set_style("whitegrid")
 sns.set_context("paper", font_scale=1.3)
 
 # ── scene constants ────────────────────────────────────────────────────
-START    = np.array([0.55, 0.00, 0.30])
-GOAL     = np.array([0.30, 0.55, 0.30])
-OBSTACLE = np.array([0.40, 0.30, 0.30])
+START    = np.array([0.46283, -0.20737, 0.24566])
+GOAL     = np.array([0.32771, 0.82123, 0.24566])
+OBSTACLE = np.array([0.34532, 0.20459, 0.00000])
 OBS_RAD  = 0.10
 
 Q_UPRIGHT = np.array([1.0, 0.0, 0.0, 0.0])
@@ -342,11 +342,26 @@ def plot_2d_topdown(trace, best_cost, base="exp3a_topdown"):
 
     fig, ax = plt.subplots(figsize=(7, 6))
 
-    # ── obstacle circle ──
-    obs_circle = plt.Circle((OBSTACLE[0], OBSTACLE[1]), OBS_RAD,
-                             color=C_OBS, alpha=0.35, zorder=2, label="Obstacle")
-    ax.add_patch(obs_circle)
-    ax.text(OBSTACLE[0], OBSTACLE[1] + OBS_RAD + 0.02, "Obstacle",
+    # ── obstacle square footprint + circular model overlay ──
+    side_half = max(OBS_HX, OBS_HY)
+    obs_square = mpatches.Rectangle(
+        (OBSTACLE[0] - side_half, OBSTACLE[1] - side_half),
+        2 * side_half,
+        2 * side_half,
+        facecolor=C_OBS,
+        edgecolor="#666666",
+        linewidth=1.0,
+        alpha=0.35,
+        zorder=2,
+        label="Obstacle footprint (square)",
+    )
+    obs_model_circle = plt.Circle((OBSTACLE[0], OBSTACLE[1]), OBS_RAD,
+                                  fill=False, color="#666666", linestyle="--",
+                                  linewidth=1.2, alpha=0.9, zorder=3,
+                                  label=f"Obstacle model circle (r={OBS_RAD:.2f} m)")
+    ax.add_patch(obs_square)
+    ax.add_patch(obs_model_circle)
+    ax.text(OBSTACLE[0], OBSTACLE[1] + side_half + 0.02, "Obstacle",
             fontsize=8, ha="center", color="#555555")
 
     # ── human proximity zones ──
@@ -765,7 +780,7 @@ def main():
     optimizer = PIBB(theta=theta_init, sigma=sigma_init, beta=8.0, decay=0.99)
 
     N_SAMPLES = 30
-    N_UPDATES = 120
+    N_UPDATES = 70
     best_cost  = float("inf")
     best_theta = theta_init.copy()
 

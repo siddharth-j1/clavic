@@ -585,7 +585,7 @@ def main():
     optimizer = PIBB(theta=theta_init, sigma=sigma_init, beta=8.0, decay=0.99)
 
     N_SAMPLES = 30
-    N_UPDATES = 70
+    N_UPDATES = 120
     best_cost  = float("inf")
     best_theta = theta_init.copy()
 

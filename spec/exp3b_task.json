@@ -12,33 +12,36 @@
     "  NONE  → no repulsion, no projector             (raw behavior, Scene 3b)",
     "",
     "The ObstacleAvoidance clause below has modality=PREFER (soft optimizer cost,",
-    "weight=6.0). This nudges the optimizer via PIBB but provides no geometric",
+    "weight=9.0). This nudges the optimizer via PIBB but provides no geometric",
     "enforcement — only the avoidance tier (NONE here) controls geometry.",
     "",
-    "2-phase task: carry ball to human (0-7s), hold at human position (7-10s).",
-    "No pour: ball stays upright, no orientation change needed.",
+    "2-phase task: carry cup to human (0-7s), hold at human position (7-10s).",
+    "No pour: keep measured cup orientation from start/goal poses.",
+    "Obstacle center computed from laptop corners (#2,#3,#4,#5).",
+    "Safe radius is kept same as Exp3a: 0.12",
+    "Measured hold point (#7) is documented but not used in this 2-phase 3b spec",
     "Stiffness reduction near human is still active (same CGMS compiler cost)."
   ],
   "horizon_sec": 10.0,
   "phases": [
     {
       "label": "carry",
-      "start": [0.55, 0.00, 0.30],
-      "end":   [0.30, 0.55, 0.30],
+      "start": [0.46283, -0.20737, 0.24566],
+      "end":   [0.32771, 0.82123, 0.24566],
       "duration": 7.0,
-      "start_quat": [1.0, 0.0, 0.0, 0.0],
-      "end_quat":   [1.0, 0.0, 0.0, 0.0],
+      "start_quat": [0.50540, -0.49933, 0.49576, 0.49945],
+      "end_quat":   [0.50540, -0.49933, 0.49576, 0.49945],
       "n_bfs_ori": 15
     },
     {
       "label": "hold",
-      "start": [0.30, 0.55, 0.30],
-      "end":   [0.30, 0.55, 0.30],
+      "start": [0.32771, 0.82123, 0.24566],
+      "end":   [0.32771, 0.82123, 0.24566],
       "duration": 3.0,
       "n_bfs_traj": 11,
       "n_bfs_slack": 3,
-      "start_quat": [1.0, 0.0, 0.0, 0.0],
-      "end_quat":   [1.0, 0.0, 0.0, 0.0],
+      "start_quat": [0.50540, -0.49933, 0.49576, 0.49945],
+      "end_quat":   [0.50540, -0.49933, 0.49576, 0.49945],
       "n_bfs_ori": 15
     }
   ],
@@ -88,19 +91,19 @@
     }
   ],
   "bindings": {
-    "AtWaypoint.waypoint":   [0.30, 0.55, 0.30],
+    "AtWaypoint.waypoint":   [0.32771, 0.82123, 0.24566],
     "AtWaypoint.tolerance":  0.04,
 
-    "HoldAtWaypoint.waypoint":        [0.30, 0.55, 0.30],
+    "HoldAtWaypoint.waypoint":        [0.32771, 0.82123, 0.24566],
     "HoldAtWaypoint.tolerance":       0.05,
     "HoldAtWaypoint.speed_threshold": 0.05,
 
-    "ObstacleAvoidance.obstacle_position": [0.40, 0.30, 0.30],
+    "ObstacleAvoidance.obstacle_position": [0.34644, 0.20459, 0.00000],
     "ObstacleAvoidance.safe_radius": 0.12,
 
     "VelocityLimit.vmax": 0.8,
 
-    "OrientationLimit.q_ref":         [1.0, 0.0, 0.0, 0.0],
+    "OrientationLimit.q_ref":         [0.50540, -0.49933, 0.49576, 0.49945],
     "OrientationLimit.max_angle_rad": 0.3,
 
     "AngularVelocityLimit.omega_max": 1.5

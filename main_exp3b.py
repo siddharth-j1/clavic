@@ -32,13 +32,12 @@ Three-tier avoidance comparison:
 CGMS guarantee K=Q^T Q > 0 is maintained throughout (same as Scene 3).
 Human-proximity stiffness reduction is active (same compiler cost).
 
-Plots (PNG only, no PDF saved):
-  1. exp3b_workspace.png      — 3D Franka FRS view (high-weight result)
-  2. exp3b_topdown.png        — 2D X-Y top-down view (high-weight result)
-  3. exp3b_comparison.png     — side-by-side low vs high obstacle weight
-  4. exp3b_stiffness.png      — Per-axis Kxx/Kyy/Kzz vs time
-  5. exp3b_orientation.png    — Euler angles vs time
-  6. exp3b_kinematics.png     — Position & velocity timeseries
+Plots (PNG only):
+    1. exp3b_workspace.png      — 3D Franka workspace view
+    2. exp3b_topdown.png        — 2D X-Y top-down view
+    3. exp3b_stiffness.png      — Per-axis Kxx/Kyy/Kzz vs time
+    4. exp3b_orientation.png    — quaternion tracking + angular error to q_ref
+    5. exp3b_kinematics.png     — Position & velocity timeseries
 """
 
 import numpy as np
@@ -68,26 +67,29 @@ from logic.predicates import (
 sns.set_style("whitegrid")
 sns.set_context("paper", font_scale=1.3)
 
-# ── scene constants ────────────────────────────────────────────────────
-START    = np.array([0.55, 0.00, 0.30])
-GOAL     = np.array([0.30, 0.55, 0.30])
-OBSTACLE = np.array([0.40, 0.30, 0.30])
-OBS_RAD  = 0.10        # nominal obstacle radius (same geometry as Scene 3)
-OBS_SAFE_RAD = OBS_RAD + 0.02   # safe radius used in ODE repulsion
+# ── scene values (loaded from JSON in main) ───────────────────────────
+START = None
+GOAL = None
+OBSTACLE = None
+OBS_RAD = None
+OBS_SAFE_RAD = None
 
-Q_UPRIGHT = np.array([1.0, 0.0, 0.0, 0.0])
+Q_UPRIGHT = None
+OBS_WEIGHT = None
 
-# 2-phase timing: carry (0-7s) + hold (7-10s)
-T_CARRY_END = 7.0
-T_HOLD_END  = 10.0
+# 2-phase timing: carry + hold
+T_CARRY_END = None
+T_HOLD_END  = None
 
-HUMAN_POS      = GOAL
+HUMAN_POS      = None
 HUMAN_PROX_RAD = 0.12
 HUMAN_RAMP_RAD = 0.36     # ramp starts at 3× proximity radius (matches compiler RAMP_FACTOR=3)
 K_AXIS_LIMIT   = 100.0    # N/m per axis — target inside proximity radius
 
-# obstacle box half-extents for plot
-OBS_HX, OBS_HY, OBS_HZ = 0.08, 0.08, 0.05
+# obstacle box half-extents for plot (scaled from circular radius)
+OBS_BOX_HX_SCALE = 0.844  # measured laptop footprint ratio: hx / r
+OBS_BOX_HY_SCALE = 0.547  # measured laptop footprint ratio: hy / r
+OBS_HX, OBS_HY, OBS_HZ = None, None, 0.05
 
 # ── colours ───────────────────────────────────────────────────────────
 C_CARRY  = "#4C72B0"
@@ -131,6 +133,21 @@ def quat_to_euler(q):
     return roll, pitch, yaw
 
 
+def smooth_quaternion_signs(q_series):
+    """Ensure sign continuity (q and -q represent same rotation)."""
+    q_cont = np.asarray(q_series, dtype=float).copy()
+    if len(q_cont) == 0:
+        return q_cont
+
+    q_cont[0] = quat_normalize(q_cont[0])
+    for i in range(1, len(q_cont)):
+        qi = quat_normalize(q_cont[i])
+        if np.dot(qi, q_cont[i - 1]) < 0.0:
+            qi = -qi
+        q_cont[i] = qi
+    return q_cont
+
+
 # ── diagnostics ───────────────────────────────────────────────────────
 def print_diagnostics(trace, best_cost):
     pos    = trace.position
@@ -160,9 +177,10 @@ def print_diagnostics(trace, best_cost):
     hold_drift = float(np.linalg.norm(pos[hold_mask] - GOAL, axis=1).max()) \
                  if np.any(hold_mask) else 0.0
 
+    obs_w = "n/a" if OBS_WEIGHT is None else f"{OBS_WEIGHT:.2f}"
     sep = "=" * 48
     print(f"\n{sep} EXP 3b DIAGNOSTICS {sep}")
-    print(f"  Scene             : Ball delivery (soft PREFER, weight=4.0, avoidance=NONE)")
+    print(f"  Scene             : Ball delivery (soft PREFER, weight={obs_w}, avoidance=NONE)")
     print(f"  Best cost         : {best_cost:.4f}")
     print(f"  Goal reached      : {'YES' if reached else 'NO'}  t={t_reach:.2f} s")
     print(f"  Max speed         : {speed.max():.4f} m/s  (limit 0.8)")
@@ -316,15 +334,30 @@ def plot_2d_topdown(trace, best_cost, base="exp3b_topdown"):
     pos = trace.position
     t   = trace.time
 
-    fig, ax = plt.subplots(figsize=(7, 6))
+    fig, ax = plt.subplots(figsize=(8.2, 6.8))
 
-    # obstacle circle — dashed edge to indicate SOFT
-    obs_circle = plt.Circle((OBSTACLE[0], OBSTACLE[1]), OBS_RAD,
-                             color=C_OBS, alpha=0.25, zorder=2,
-                             linestyle="--", label="Obstacle (soft avoidance)")
-    ax.add_patch(obs_circle)
-    # obstacle label
-    ax.text(OBSTACLE[0], OBSTACLE[1] + OBS_RAD + 0.025, "Obstacle\n(soft — ball can pass)",
+    # Plot laptop as square footprint for visualization.
+    # Optimization still uses circular obstacle distance with radius OBS_RAD.
+    side_half = max(OBS_HX, OBS_HY)
+    obs_rect = mpatches.Rectangle(
+        (OBSTACLE[0] - side_half, OBSTACLE[1] - side_half),
+        2 * side_half,
+        2 * side_half,
+        facecolor=C_OBS,
+        edgecolor="#777777",
+        linewidth=1.0,
+        alpha=0.25,
+        zorder=2,
+        label="Laptop footprint (square plot)",
+    )
+    ax.add_patch(obs_rect)
+    obs_safe = plt.Circle((OBSTACLE[0], OBSTACLE[1]), OBS_RAD,
+                          fill=False, color="#777777", linestyle="--",
+                          linewidth=1.2, alpha=0.85, zorder=3,
+                          label=f"Obstacle model circle (r={OBS_RAD:.2f} m)")
+    ax.add_patch(obs_safe)
+
+    ax.text(OBSTACLE[0], OBSTACLE[1] + side_half + 0.025, "Obstacle\n(square plot, circle cost)",
             fontsize=7.5, ha="center", color="#555555", style="italic")
 
     # human proximity zones
@@ -363,20 +396,30 @@ def plot_2d_topdown(trace, best_cost, base="exp3b_topdown"):
     ax.set_title(f"Top-down view: table plane (X–Y)\n{SCENE_LABEL}", fontsize=10)
     ax.set_aspect("equal")
 
-    margin = 0.08
-    xlo = min(START[0], GOAL[0]) - margin
-    xhi = max(START[0], GOAL[0]) + margin
-    ylo = min(START[1], GOAL[1]) - margin
-    yhi = max(START[1], GOAL[1]) + margin
+    x_candidates = [
+        START[0], GOAL[0],
+        OBSTACLE[0] - max(OBS_RAD, side_half), OBSTACLE[0] + max(OBS_RAD, side_half),
+        GOAL[0] - HUMAN_RAMP_RAD, GOAL[0] + HUMAN_RAMP_RAD,
+    ]
+    y_candidates = [
+        START[1], GOAL[1],
+        OBSTACLE[1] - max(OBS_RAD, side_half), OBSTACLE[1] + max(OBS_RAD, side_half),
+        GOAL[1] - HUMAN_RAMP_RAD, GOAL[1] + HUMAN_RAMP_RAD,
+    ]
+    margin = 0.04
+    xlo = min(x_candidates) - margin
+    xhi = max(x_candidates) + margin
+    ylo = min(y_candidates) - margin
+    yhi = max(y_candidates) + margin
     ax.set_xlim(xlo, xhi)
     ax.set_ylim(ylo, yhi)
 
     ax.grid(True, alpha=0.25)
-    # ── legend at lower LEFT (not lower right) ──────────────────────
-    ax.legend(fontsize=8, loc="lower left", framealpha=0.9,
+    ax.legend(fontsize=8, loc="upper left", bbox_to_anchor=(1.02, 1.0),
+              borderaxespad=0.0, framealpha=0.9,
               edgecolor="lightgrey", fancybox=False)
 
-    plt.tight_layout()
+    plt.tight_layout(rect=[0.0, 0.0, 0.79, 1.0])
     plt.savefig(f"{base}.png", dpi=300, bbox_inches="tight", facecolor="white")
     print(f"Saved: {base}.png")
     plt.close()
@@ -451,39 +494,48 @@ def plot_orientation_euler(trace, best_cost, base="exp3b_orientation"):
     if trace.orientation is None:
         print("No orientation — skipping orientation plot.")
         return
-    q     = trace.orientation
-    t     = trace.time
-    euler = np.array([quat_to_euler(q[k]) for k in range(len(t))])
-    roll, pitch, yaw = euler[:, 0], euler[:, 1], euler[:, 2]
+    q = smooth_quaternion_signs(trace.orientation)
+    t = trace.time
+    q_ref = quat_normalize(Q_UPRIGHT)
+    ang_err = np.degrees(np.array([quat_distance(quat_normalize(qi), q_ref) for qi in q]))
 
-    fig, ax = plt.subplots(figsize=(9, 4.2))
-    ax.axvspan(0,           T_CARRY_END, alpha=0.025, color=C_CARRY, zorder=0)
-    ax.axvspan(T_CARRY_END, T_HOLD_END,  alpha=0.025, color=C_HOLD,  zorder=0)
+    fig, (ax0, ax1) = plt.subplots(2, 1, figsize=(9, 6.2), sharex=True)
 
-    ax.plot(t, roll,  color=C_KX, lw=1.4, ls="--", alpha=0.55,
-            label="roll  $\\theta_x$ (should be ~0)")
-    ax.plot(t, yaw,   color=C_KZ, lw=1.4, ls="--", alpha=0.55,
-            label="yaw   $\\theta_z$ (should be ~0)")
-    ax.plot(t, pitch, color=C_KY, lw=2.5,
-            label="pitch $\\theta_y$ (ball axis)")
+    for ax in (ax0, ax1):
+        ax.axvspan(0,           T_CARRY_END, alpha=0.025, color=C_CARRY, zorder=0)
+        ax.axvspan(T_CARRY_END, T_HOLD_END,  alpha=0.025, color=C_HOLD,  zorder=0)
+        ax.grid(True, alpha=0.25)
 
-    ax.axhline(0.0, color="#999999", ls="-", lw=0.5, alpha=0.30, zorder=1)
+    ax0.plot(t, q[:, 0], color="#4C72B0", lw=2.0, label="qw")
+    ax0.plot(t, q[:, 1], color="#DD8452", lw=2.0, label="qx")
+    ax0.plot(t, q[:, 2], color="#55A868", lw=2.0, label="qy")
+    ax0.plot(t, q[:, 3], color="#C44E52", lw=2.0, label="qz")
+    ax0.axhline(q_ref[0], color="#4C72B0", ls=":", lw=1.0, alpha=0.50)
+    ax0.axhline(q_ref[1], color="#DD8452", ls=":", lw=1.0, alpha=0.50)
+    ax0.axhline(q_ref[2], color="#55A868", ls=":", lw=1.0, alpha=0.50)
+    ax0.axhline(q_ref[3], color="#C44E52", ls=":", lw=1.0, alpha=0.50)
+    ax0.set_ylabel("Quat comp.", fontsize=10)
+    ax0.set_ylim(-1.05, 1.05)
+    ax0.legend(fontsize=8.5, loc="upper right", framealpha=0.9,
+               edgecolor="lightgrey", fancybox=False, ncol=2)
+    ax0.set_title(f"{SCENE_LABEL}\nOrientation tracking", fontsize=10)
 
-    all_max = max(abs(roll).max(), abs(pitch).max(), abs(yaw).max(), 20)
-    ax.set_ylim(-all_max * 1.15, all_max * 1.15)
+    ax1.plot(t, ang_err, color="#8172B2", lw=2.2,
+             label="Angular error to q_ref")
+    ax1.axhline(0.0, color="#999999", ls="-", lw=0.7, alpha=0.40)
+    ax1.set_ylabel("Error (deg)", fontsize=10)
+    ax1.set_xlabel("Time (s)", fontsize=11)
+    ax1.set_xlim(0, T_HOLD_END)
+    ax1.legend(fontsize=8.5, loc="upper right", framealpha=0.9,
+               edgecolor="lightgrey", fancybox=False)
 
-    yhi = ax.get_ylim()[1]
-    for tx, lb, col in [(3.0, "Carry", C_CARRY), (8.5, "Hold", C_HOLD)]:
-        ax.text(tx, yhi * 0.88, lb, fontsize=8, color=col,
-                ha="center", fontweight="bold", alpha=0.70)
+    y0 = max(5.0, float(np.max(ang_err) * 1.15))
+    ax1.set_ylim(0.0, y0)
 
-    ax.set_xlabel("Time (s)", fontsize=11)
-    ax.set_ylabel("Angle (deg)", fontsize=11)
-    ax.set_title(SCENE_LABEL, fontsize=9)
-    ax.set_xlim(0, T_HOLD_END)
-    ax.grid(True, alpha=0.25)
-    ax.legend(fontsize=9, loc="upper left", framealpha=0.9,
-              edgecolor="lightgrey", fancybox=False)
+    for tx, lb, col in [(0.5 * T_CARRY_END, "Carry", C_CARRY),
+                        (0.5 * (T_CARRY_END + T_HOLD_END), "Hold", C_HOLD)]:
+        ax1.text(tx, y0 * 0.90, lb, fontsize=8, color=col,
+                 ha="center", fontweight="bold", alpha=0.70)
 
     plt.tight_layout()
     plt.savefig(f"{base}.png", dpi=300, bbox_inches="tight", facecolor="white")
@@ -615,15 +667,42 @@ def save_trajectory_csv(trace, csv_path="exp3b_trajectory.csv"):
 #  main
 # ======================================================================
 def main():
+    global START, GOAL, OBSTACLE, OBS_RAD, OBS_SAFE_RAD
+    global Q_UPRIGHT, OBS_WEIGHT, T_CARRY_END, T_HOLD_END
+    global HUMAN_POS, OBS_HX, OBS_HY
+
     taskspec = load_taskspec_from_json("spec/exp3b_task.json")
     assert taskspec.phases is not None
 
-    # Override obstacle weight to 4.0 (soft PREFER — low weight means
-    # optimizer trades off avoidance freely; path may clip/penetrate obstacle)
-    OBS_WEIGHT = 4.0
-    for clause in taskspec.clauses:
-        if clause.predicate == "ObstacleAvoidance":
-            clause.weight = OBS_WEIGHT
+    phases = taskspec.phases
+    START = np.asarray(phases[0]["start"], dtype=float)
+    GOAL = np.asarray(phases[-1]["end"], dtype=float)
+    durations = [float(p.get("duration", 0.0)) for p in phases]
+    T_CARRY_END = durations[0] if durations else 0.0
+    T_HOLD_END = float(np.sum(durations)) if durations else 0.0
+    Q_UPRIGHT = np.asarray(phases[0].get("start_quat", [1.0, 0.0, 0.0, 0.0]), dtype=float)
+
+    obs_clause = next((c for c in taskspec.clauses
+                       if c.predicate == "ObstacleAvoidance"), None)
+    if obs_clause is None:
+        raise ValueError("exp3b_task.json must include an ObstacleAvoidance clause")
+
+    OBS_WEIGHT = float(obs_clause.weight)
+    if "obstacle_position" not in obs_clause.parameters or "safe_radius" not in obs_clause.parameters:
+        raise ValueError("ObstacleAvoidance clause must provide obstacle_position and safe_radius")
+
+    OBSTACLE = np.asarray(obs_clause.parameters["obstacle_position"], dtype=float)
+    OBS_RAD = float(obs_clause.parameters["safe_radius"])
+    OBS_SAFE_RAD = OBS_RAD
+
+    ori_clause = next((c for c in taskspec.clauses
+                       if c.predicate == "OrientationLimit"), None)
+    if ori_clause is not None and "q_ref" in ori_clause.parameters:
+        Q_UPRIGHT = np.asarray(ori_clause.parameters["q_ref"], dtype=float)
+
+    HUMAN_POS = GOAL.copy()
+    OBS_HX = max(0.04, OBS_RAD * OBS_BOX_HX_SCALE)
+    OBS_HY = max(0.04, OBS_RAD * OBS_BOX_HY_SCALE)
 
     policy = MultiPhaseCertifiedPolicy(taskspec.phases, K0=300.0, D0=30.0)
 
@@ -638,9 +717,9 @@ def main():
     ])
 
     theta_dim = policy.parameter_dimension()
-    print(f"Exp 3b: Ball delivery — soft PREFER obstacle avoidance (weight={OBS_WEIGHT})")
+    print(f"Exp 3b: Ball delivery — soft PREFER obstacle avoidance (weight={OBS_WEIGHT:.2f})")
     print(f"  avoidance=NONE: no DMP repulsion, no projector")
-    print(f"  Soft cost only: weight={OBS_WEIGHT} * max(0, -rho)  in objective")
+    print(f"  Soft cost only: weight={OBS_WEIGHT:.2f} * max(0, -rho)  in objective")
     print(f"Multi-phase policy: {len(taskspec.phases)} phases, theta_dim={theta_dim}")
     print(f"  has_orientation: {policy.has_orientation}")
     for i, p in enumerate(taskspec.phases):
@@ -672,12 +751,12 @@ def main():
     optimizer = PIBB(theta=theta_init, sigma=sigma_init, beta=8.0, decay=0.99)
 
     N_SAMPLES = 30
-    N_UPDATES = 120
+    N_UPDATES = 70
     best_cost  = float("inf")
     best_theta = theta_init.copy()
 
     print(f"\nPIBB: {N_UPDATES} updates x {N_SAMPLES} samples")
-    print(f"  Obstacle: PREFER (soft), weight={OBS_WEIGHT}, avoidance=NONE")
+    print(f"  Obstacle: PREFER (soft), weight={OBS_WEIGHT:.2f}, avoidance=NONE")
     print(f"  K penalty: ramp [d < {HUMAN_RAMP_RAD} m], limit {K_AXIS_LIMIT:.0f} N/m at [d < {HUMAN_PROX_RAD} m]")
 
     for upd in range(N_UPDATES):
@@ -692,8 +771,8 @@ def main():
             best_theta = samples[np.argmin(costs)].copy()
 
         if (upd + 1) % 1 == 0 or upd == 0:
-            print(f"  [{upd+1:03d}]  min={costs.min():.4f}  "
-                  f"mean={costs.mean():.4f}  best={best_cost:.4f}")
+            print(f"  [{upd+1:03d}]  min={costs_s.min():.4f}  "
+                  f"mean(clipped)={costs_s.mean():.4f}  best={best_cost:.4f}")
 
     print("Optimization complete.\n")
 

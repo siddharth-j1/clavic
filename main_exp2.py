@@ -18,10 +18,10 @@ Key features vs Scene 3:
   - Same geometry as Scene 3/3b: start, goal, obstacle positions identical
 
 Geometry:
-  Start     : [0.55, 0.00, 0.30]
-  Waypoint  : [0.20, 0.35, 0.30]  — hold here for 2 s
-  Goal      : [0.30, 0.55, 0.30]  — delivery point (no human)
-  Obstacle  : [0.40, 0.30, 0.30]  (same as Scene 3)
+    Start     : [0.46283, -0.20737, 0.24566]
+    Waypoint  : [0.66840, 0.33978, 0.21647]  — hold here for 2 s
+    Goal      : [0.32771, 0.82123, 0.24566]
+    Obstacle  : [0.34532, 0.20459, 0.00000]
 
 Plots (PNG only, 300 dpi):
   1. scene4_workspace.png   — 3D Franka FRS view
@@ -57,10 +57,10 @@ sns.set_style("whitegrid")
 sns.set_context("paper", font_scale=1.3)
 
 # ── scene constants ────────────────────────────────────────────────────
-START    = np.array([0.55, 0.00, 0.30])
-WAYPOINT = np.array([0.20, 0.35, 0.30])
-GOAL     = np.array([0.30, 0.55, 0.30])
-OBSTACLE = np.array([0.40, 0.30, 0.30])
+START    = np.array([0.46283, -0.20737, 0.24566])
+WAYPOINT = np.array([0.66840, 0.33978, 0.21647])
+GOAL     = np.array([0.32771, 0.82123, 0.24566])
+OBSTACLE = np.array([0.34532, 0.20459, 0.00000])
 OBS_RAD      = 0.10
 OBS_SAFE_RAD = OBS_RAD + 0.02   # 0.12 m — matches JSON safe_radius
 
@@ -310,15 +310,26 @@ def plot_2d_topdown(trace, best_cost, base="exp2_topdown"):
 
     fig, ax = plt.subplots(figsize=(7, 6.5))
 
-    # obstacle circle — solid edge = HARD
-    obs_circle = plt.Circle((OBSTACLE[0], OBSTACLE[1]), OBS_RAD,
-                             color=C_OBS, alpha=0.30, zorder=2)
-    obs_edge   = plt.Circle((OBSTACLE[0], OBSTACLE[1]), OBS_SAFE_RAD,
-                             color="#333333", alpha=0.0, fill=False,
-                             linestyle="-", linewidth=1.4, zorder=3)
-    ax.add_patch(obs_circle)
+    side_half = max(OBS_HX, OBS_HY)
+    obs_square = mpatches.Rectangle(
+        (OBSTACLE[0] - side_half, OBSTACLE[1] - side_half),
+        2 * side_half,
+        2 * side_half,
+        facecolor=C_OBS,
+        edgecolor="#666666",
+        linewidth=1.0,
+        alpha=0.30,
+        zorder=2,
+        label="Obstacle footprint (square)",
+    )
+    obs_edge = plt.Circle((OBSTACLE[0], OBSTACLE[1]), OBS_SAFE_RAD,
+                          color="#333333", alpha=0.0, fill=False,
+                          linestyle="-", linewidth=1.4, zorder=3,
+                          label=f"HARD model circle (r={OBS_SAFE_RAD:.2f} m)")
+    ax.add_patch(obs_square)
     ax.add_patch(obs_edge)
-    ax.text(OBSTACLE[0], OBSTACLE[1] + OBS_RAD + 0.025, "Obstacle\n(HARD guarantee)",
+    ax.text(OBSTACLE[0], OBSTACLE[1] + side_half + 0.025,
+            "Obstacle\n(square plot, circle guarantee)",
             fontsize=7.5, ha="center", color="#333333", fontweight="bold")
 
     # straight start→goal

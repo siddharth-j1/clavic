@@ -15,24 +15,24 @@
     "  - Human proximity stiffness reduction active at final goal",
     "",
     "Geometry:",
-    "  Start    : [0.55, 0.00, 0.30]",
-    "  Waypoint : [0.20, 0.35, 0.30]  (midway, left of obstacle)",
-    "  Goal     : [0.30, 0.55, 0.30]  (same as Scene 3 \u2014 human position)",
-    "  Obstacle : [0.40, 0.30, 0.30]  (same as Scene 3)"
+    "  Start    : [0.46283, -0.20737, 0.24566]",
+    "  Waypoint : [0.66840, 0.33978, 0.21647]  (measured hold point #7)",
+    "  Goal     : [0.32771, 0.82123, 0.24566]",
+    "  Obstacle : [0.34532, 0.20459, 0.00000]  (laptop center from corners #2-#5)"
   ],
   "horizon_sec": 11.0,
   "phases": [
     {
       "label": "carry",
       "start": [
-        0.55,
-        0.0,
-        0.3
+        0.46283,
+        -0.20737,
+        0.24566
       ],
       "end": [
-        0.2,
-        0.35,
-        0.3
+        0.6684,
+        0.33978,
+        0.21647
       ],
       "duration": 5.0,
       "start_quat": [
@@ -52,14 +52,14 @@
     {
       "label": "hold",
       "start": [
-        0.2,
-        0.35,
-        0.3
+        0.6684,
+        0.33978,
+        0.21647
       ],
       "end": [
-        0.2,
-        0.35,
-        0.3
+        0.6684,
+        0.33978,
+        0.21647
       ],
       "duration": 2.0,
       "n_bfs_traj": 11,
@@ -81,14 +81,14 @@
     {
       "label": "continue",
       "start": [
-        0.2,
-        0.35,
-        0.3
+        0.6684,
+        0.33978,
+        0.21647
       ],
       "end": [
-        0.3,
-        0.55,
-        0.3
+        0.32771,
+        0.82123,
+        0.24566
       ],
       "duration": 4.0,
       "start_quat": [
@@ -182,35 +182,35 @@
   ],
   "bindings": {
     "AtWaypoint.waypoint": [
-      0.2,
-      0.35,
-      0.3
+      0.6684,
+      0.33978,
+      0.21647
     ],
     "AtWaypoint.tolerance": 0.04,
     "HoldAtWaypoint.waypoint": [
-      0.2,
-      0.35,
-      0.3
+      0.6684,
+      0.33978,
+      0.21647
     ],
     "HoldAtWaypoint.tolerance": 0.05,
     "HoldAtWaypoint.speed_threshold": 0.05,
     "AtGoal.waypoint": [
-      0.3,
-      0.55,
-      0.3
+      0.32771,
+      0.82123,
+      0.24566
     ],
     "AtGoal.tolerance": 0.04,
     "HoldAtGoal.waypoint": [
-      0.3,
-      0.55,
-      0.3
+      0.32771,
+      0.82123,
+      0.24566
     ],
     "HoldAtGoal.tolerance": 0.05,
     "HoldAtGoal.speed_threshold": 0.05,
     "ObstacleAvoidance.obstacle_position": [
-      0.4,
-      0.3,
-      0.3
+      0.34532,
+      0.20459,
+      0.0
     ],
     "ObstacleAvoidance.safe_radius": 0.12,
     "VelocityLimit.vmax": 0.8,
