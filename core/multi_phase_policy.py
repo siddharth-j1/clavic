@@ -133,13 +133,15 @@ class MultiPhaseCertifiedPolicy:
     # ------------------------------------------------------------------ #
     def set_obstacles(self, obstacles):
         """
-        Register spherical obstacles with three-tier avoidance control.
+        Register obstacles with three-tier avoidance control.
 
         Parameters
         ----------
         obstacles : list of dict, each with keys:
             "center"      : array-like (3,)
             "radius"      : float              — safe clearance radius
+            "geometry"    : str    (optional)  — "sphere" (default) or
+                                                   "cylinder_infinite"
             "avoidance"   : str    (optional)  — one of "HARD", "SOFT", "NONE".
                                                  Default: "HARD".
             "strength"    : float  (optional)  — DMP repulsion strength (default 0.05).
@@ -210,11 +212,13 @@ class MultiPhaseCertifiedPolicy:
             r      = float(obs["radius"])
             s      = float(obs.get("strength",    0.05))
             ifact  = float(obs.get("infl_factor", 2.5))
+            g      = str(obs.get("geometry", "sphere"))
             rep_obs.append({
                 "center":  c,
                 "radius":  r,
                 "r_infl":  r * ifact,
                 "strength": s,
+                "geometry": g,
             })
 
         # Inject into every phase DMP

@@ -55,14 +55,15 @@ from logic.predicates import (
 sns.set_style("whitegrid")
 sns.set_context("paper", font_scale=1.3)
 
-# ── scene constants ────────────────────────────────────────────────────
-START  = np.array([0.55, 0.00, 0.30])
-GOAL   = np.array([0.30, 0.55, 0.30])
-HUMAN  = np.array([0.30, 0.30, 0.30])
+# ── scene constants (loaded from JSON in main()) ─────────────────────
+START  = None
+GOAL   = None
+HUMAN  = None
 
 HUMAN_BODY_RAD    = 0.08
 HUMAN_COMFORT_RAD = 0.19
 HUMAN_RAMP_RAD    = 3.0 * HUMAN_COMFORT_RAD
+HUMAN_GEOMETRY    = "sphere"
 K_AXIS_LIMIT      = 100.0
 
 HORIZON = 10.0
@@ -103,6 +104,13 @@ def quat_to_euler(q):
     return roll, pitch, yaw
 
 
+def _distance_to_human(positions):
+    positions = np.asarray(positions, dtype=float)
+    if HUMAN_GEOMETRY == "cylinder_infinite":
+        return np.linalg.norm(positions[:, :2] - HUMAN[:2], axis=1)
+    return np.linalg.norm(positions - HUMAN, axis=1)
+
+
 # ── diagnostics ───────────────────────────────────────────────────────
 def print_diagnostics(trace, best_cost):
     pos   = trace.position
@@ -115,7 +123,7 @@ def print_diagnostics(trace, best_cost):
     trD = np.array([np.trace(D) for D in D_arr])
     K_diag = np.array([[K[0,0], K[1,1], K[2,2]] for K in K_arr])
 
-    d_human  = np.linalg.norm(pos - HUMAN, axis=1)
+    d_human  = _distance_to_human(pos)
     d_goal   = np.linalg.norm(pos - GOAL,  axis=1)
 
     body_cm    = (d_human.min() - HUMAN_BODY_RAD)    * 100.0
@@ -132,7 +140,7 @@ def print_diagnostics(trace, best_cost):
     print(f"  Best cost              : {best_cost:.4f}")
     print(f"  Goal reached           : {'YES' if reached else 'NO'}  t={t_reach:.2f} s")
     print(f"  Max speed              : {speed.max():.4f} m/s  (limit 0.8)")
-    print(f"  --- Human Body (HARD, r={HUMAN_BODY_RAD:.2f} m) ---")
+    print(f"  --- Human Body (HARD {HUMAN_GEOMETRY}, r={HUMAN_BODY_RAD:.2f} m) ---")
     print(f"  Min clearance (body)   : {body_cm:+.1f} cm  (must be > 0)")
     print(f"  Pts inside body        : {n_in_body}  (must be 0)")
     print(f"  --- Comfort Zone (SOFT, r={HUMAN_COMFORT_RAD:.2f} m) ---")
@@ -340,7 +348,7 @@ def plot_stiffness(trace, best_cost, base="exp1_stiffness"):
     K_arr = trace.gains["K"]
     Kd    = np.array([[K[0,0], K[1,1], K[2,2]] for K in K_arr])
     t     = trace.time
-    d_human = np.linalg.norm(trace.position - HUMAN, axis=1)
+    d_human = _distance_to_human(trace.position)
 
     fig, ax = plt.subplots(figsize=(10, 4.2))
 
@@ -433,7 +441,7 @@ def plot_kinematics(trace, best_cost, base="exp1_kinematics"):
     vel   = trace.velocity
     t     = trace.time
     speed = np.linalg.norm(vel, axis=1)
-    d_human = np.linalg.norm(pos - HUMAN, axis=1)
+    d_human = _distance_to_human(pos)
     d_goal  = np.linalg.norm(pos - GOAL,  axis=1)
 
     c_x = "#4C72B0"; c_y = "#DD8452"; c_z = "#55A868"; c_spd = "#8172B2"
@@ -546,8 +554,34 @@ def save_trajectory_csv(trace, csv_path="exp1_trajectory.csv"):
 #  main
 # ======================================================================
 def main():
+    global START, GOAL, HUMAN
+    global HUMAN_BODY_RAD, HUMAN_COMFORT_RAD, HUMAN_RAMP_RAD, HUMAN_GEOMETRY
+    global HORIZON
+
     taskspec = load_taskspec_from_json("spec/exp1_task.json")
     assert taskspec.phases is not None, "exp1_task.json must define phases"
+
+    START = np.asarray(taskspec.phases[0]["start"], dtype=float)
+    GOAL = np.asarray(taskspec.phases[-1]["end"], dtype=float)
+    HORIZON = float(np.sum([float(p["duration"]) for p in taskspec.phases]))
+
+    body_clause = next((cl for cl in taskspec.clauses if cl.predicate == "HumanBodyExclusion"), None)
+    if body_clause is None:
+        raise ValueError("exp1_task.json must include a HumanBodyExclusion clause")
+    if "human_position" not in body_clause.parameters or "body_radius" not in body_clause.parameters:
+        raise ValueError("HumanBodyExclusion must define human_position and body_radius")
+
+    HUMAN = np.asarray(body_clause.parameters["human_position"], dtype=float)
+    HUMAN_BODY_RAD = float(body_clause.parameters["body_radius"])
+    HUMAN_GEOMETRY = str(body_clause.parameters.get("geometry", "sphere"))
+
+    comfort_clause = next((cl for cl in taskspec.clauses if cl.predicate == "HumanComfortDistance"), None)
+    if comfort_clause is not None:
+        if "preferred_distance" in comfort_clause.parameters:
+            HUMAN_COMFORT_RAD = float(comfort_clause.parameters["preferred_distance"])
+        if "human_position" in comfort_clause.parameters:
+            HUMAN = np.asarray(comfort_clause.parameters["human_position"], dtype=float)
+    HUMAN_RAMP_RAD = 3.0 * HUMAN_COMFORT_RAD
 
     policy = MultiPhaseCertifiedPolicy(taskspec.phases, K0=300.0, D0=30.0)
 
@@ -558,8 +592,11 @@ def main():
     theta_dim = policy.parameter_dimension()
     print(f"Exp 1: Carry to Goal (human at {HUMAN.tolist()})")
     print(f"Multi-phase policy: {len(taskspec.phases)} phase, theta_dim={theta_dim}")
-    print(f"  Body excl. (HARD, from JSON):  r={HUMAN_BODY_RAD:.2f} m  — geometric guarantee")
-    print(f"  Comfort zone (SOFT):  r={HUMAN_COMFORT_RAD:.2f} m  — PREFER weight=15.0")
+    print(f"  Body excl. (HARD, from JSON):  geometry={HUMAN_GEOMETRY}, r={HUMAN_BODY_RAD:.2f} m")
+    if comfort_clause is not None:
+        print(f"  Comfort zone (SOFT):  r={HUMAN_COMFORT_RAD:.2f} m  — PREFER weight={comfort_clause.weight:.1f}")
+    else:
+        print(f"  Comfort zone (SOFT):  r={HUMAN_COMFORT_RAD:.2f} m")
     print(f"  Stiffness ramp:       starts at d={HUMAN_RAMP_RAD:.2f} m  → K_ii ≤ {K_AXIS_LIMIT:.0f} N/m inside r={HUMAN_COMFORT_RAD:.2f} m")
 
     predicate_registry = build_predicate_registry()
@@ -585,7 +622,7 @@ def main():
     optimizer = PIBB(theta=theta_init, sigma=sigma_init, beta=8.0, decay=0.99)
 
     N_SAMPLES = 30
-    N_UPDATES = 120
+    N_UPDATES = 70
     best_cost  = float("inf")
     best_theta = theta_init.copy()
 

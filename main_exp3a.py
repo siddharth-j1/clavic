@@ -42,20 +42,21 @@ from logic.predicates import (
 sns.set_style("whitegrid")
 sns.set_context("paper", font_scale=1.3)
 
-# ── scene constants ────────────────────────────────────────────────────
-START    = np.array([0.46283, -0.20737, 0.24566])
-GOAL     = np.array([0.32771, 0.82123, 0.24566])
-OBSTACLE = np.array([0.34532, 0.20459, 0.00000])
-OBS_RAD  = 0.10
+# ── scene constants (loaded from JSON in main()) ──────────────────────
+START    = None
+GOAL     = None
+OBSTACLE = None
+OBS_RAD  = 0.12
+OBSTACLE_GEOMETRY = "sphere"
 
 Q_UPRIGHT = np.array([1.0, 0.0, 0.0, 0.0])
 Q_POUR    = quat_normalize(np.array([0.70710678, 0.0, 0.70710678, 0.0]))
 
-# 2-phase timing: carry (0-7s) + pour (7-10s)
+# 2-phase timing (loaded from JSON in main())
 T_CARRY_END = 7.0
 T_POUR_END  = 10.0
 
-HUMAN_POS      = GOAL
+HUMAN_POS      = np.zeros(3)
 HUMAN_PROX_RAD = 0.12
 HUMAN_RAMP_RAD = 0.36        # ramp starts at 3× proximity radius (matches compiler RAMP_FACTOR=3)
 K_AXIS_LIMIT   = 100.0       # N/m per axis — target inside proximity radius (matches compiler)
@@ -115,16 +116,21 @@ def print_diagnostics(trace, best_cost):
     reached = bool(np.any(d_goal < 0.05))
     t_reach = float(trace.time[np.argmax(d_goal < 0.05)]) if reached else -1.0
 
-    d_obs     = np.linalg.norm(pos[:, :2] - OBSTACLE[:2], axis=1)
+    if OBSTACLE_GEOMETRY == "cylinder_infinite":
+        d_obs = np.linalg.norm(pos[:, :2] - OBSTACLE[:2], axis=1)
+    else:
+        d_obs = np.linalg.norm(pos - OBSTACLE, axis=1)
     obs_cm    = (d_obs.min() - OBS_RAD) * 100.0
     K_eig_min = float(min(np.linalg.eigvalsh(K)[0] for K in K_arr))
 
-    # How many carry-phase timesteps were projected (i.e. DMP wanted inside sphere)
+    # How many carry-phase timesteps were projected to the hard boundary.
     carry_mask_d = trace.time <= T_CARRY_END
     pos_carry_d  = pos[carry_mask_d]
-    d_carry_obs  = np.linalg.norm(pos_carry_d - OBSTACLE, axis=1)
-    # After projection all points are at d >= r+margin; check how many are exactly on surface
-    n_projected  = int(np.sum(np.abs(d_carry_obs - (OBS_RAD + 0.02)) < 1e-3))
+    if OBSTACLE_GEOMETRY == "cylinder_infinite":
+        d_carry_obs = np.linalg.norm(pos_carry_d[:, :2] - OBSTACLE[:2], axis=1)
+    else:
+        d_carry_obs = np.linalg.norm(pos_carry_d - OBSTACLE, axis=1)
+    n_projected  = int(np.sum(np.abs(d_carry_obs - OBS_RAD) < 1e-3))
 
     near_mask = d_goal < HUMAN_PROX_RAD
     ramp_mask = d_goal < HUMAN_RAMP_RAD
@@ -138,7 +144,7 @@ def print_diagnostics(trace, best_cost):
     print(f"  Best cost          : {best_cost:.4f}")
     print(f"  Goal reached       : {'YES' if reached else 'NO'}  t={t_reach:.2f} s")
     print(f"  Max speed          : {speed.max():.4f} m/s  (limit 0.8)")
-    print(f"  Obstacle clearance : {obs_cm:.1f} cm  (hard proj r={OBS_RAD+0.02:.2f} m)")
+    print(f"  Obstacle clearance : {obs_cm:.1f} cm  (hard {OBSTACLE_GEOMETRY}, r={OBS_RAD:.2f} m)")
     print(f"  Pts on proj surface: {n_projected}  (0 = DMP already avoids; >0 = projector active)")
     print(f"  Pour pos drift     : {pour_drift*100:.1f} cm  (target < 5)")
     print(f"  tr(K) range        : [{trK.min():.0f}, {trK.max():.0f}] N/m")
@@ -561,7 +567,10 @@ def plot_kinematics(trace, best_cost, base="exp3a_kinematics"):
     t   = trace.time
 
     speed   = np.linalg.norm(vel, axis=1)
-    d_obs   = np.linalg.norm(pos - OBSTACLE, axis=1)
+    if OBSTACLE_GEOMETRY == "cylinder_infinite":
+        d_obs = np.linalg.norm(pos[:, :2] - OBSTACLE[:2], axis=1)
+    else:
+        d_obs = np.linalg.norm(pos - OBSTACLE, axis=1)
     d_goal  = np.linalg.norm(pos - GOAL,     axis=1)
 
     # colour palette — consistent with rest of paper
@@ -715,11 +724,40 @@ def main():
     taskspec = load_taskspec_from_json("spec/exp3a_task.json")
     assert taskspec.phases is not None
 
+    global START, GOAL, OBSTACLE, OBS_RAD, OBSTACLE_GEOMETRY
+    global Q_UPRIGHT, Q_POUR, T_CARRY_END, T_POUR_END, HUMAN_POS
+
+    START = np.asarray(taskspec.phases[0]["start"], dtype=float)
+    GOAL = np.asarray(taskspec.phases[-1]["end"], dtype=float)
+    phase_durations = [float(p["duration"]) for p in taskspec.phases]
+    T_CARRY_END = phase_durations[0]
+    T_POUR_END = float(np.sum(phase_durations))
+
+    Q_UPRIGHT = quat_normalize(np.asarray(taskspec.phases[0].get("start_quat", [1.0, 0.0, 0.0, 0.0]), dtype=float))
+    Q_POUR = quat_normalize(np.asarray(taskspec.phases[-1].get("end_quat", [1.0, 0.0, 0.0, 0.0]), dtype=float))
+
+    obs_clause = next((cl for cl in taskspec.clauses if cl.predicate == "ObstacleAvoidance"), None)
+    if obs_clause is None:
+        raise ValueError("Exp3a requires an ObstacleAvoidance clause in spec/exp3a_task.json")
+    OBSTACLE = np.asarray(obs_clause.parameters["obstacle_position"], dtype=float)
+    OBS_RAD = float(obs_clause.parameters["safe_radius"])
+    OBSTACLE_GEOMETRY = str(obs_clause.parameters.get("geometry", "sphere"))
+
+    ori_limit_clause = next((cl for cl in taskspec.clauses if cl.predicate == "OrientationLimit"), None)
+    if ori_limit_clause is not None and "q_ref" in ori_limit_clause.parameters:
+        Q_UPRIGHT = quat_normalize(np.asarray(ori_limit_clause.parameters["q_ref"], dtype=float))
+
+    ori_target_clause = next((cl for cl in taskspec.clauses if cl.predicate == "OrientationAtTarget"), None)
+    if ori_target_clause is not None and "q_target" in ori_target_clause.parameters:
+        Q_POUR = quat_normalize(np.asarray(ori_target_clause.parameters["q_target"], dtype=float))
+
+    HUMAN_POS = GOAL.copy()
+
     policy    = MultiPhaseCertifiedPolicy(taskspec.phases, K0=300.0, D0=30.0)
 
 
     # ── Hard obstacle avoidance by construction ────────────────────────
-    # Register obstacle sphere — two-layer avoidance:
+    # Register hard obstacle from JSON — two-layer avoidance:
     #   Layer 1 (DMP repulsion, inside ODE): steers the spring-damper attractor
     # Layers 1+2 (DMP repulsion + radial projector) are wired automatically
     # from the JSON modality="HARD" clause — no manual hardcoding needed.
@@ -730,6 +768,7 @@ def main():
     policy.setup_hard_obstacles_from_taskspec(taskspec)
     theta_dim = policy.parameter_dimension()
     print(f"Multi-phase policy: {len(taskspec.phases)} phases, theta_dim={theta_dim}")
+    print(f"  obstacle geometry: {OBSTACLE_GEOMETRY}, radius={OBS_RAD:.3f} m")
     print(f"  has_orientation: {policy.has_orientation}")
     for i, p in enumerate(taskspec.phases):
         od = policy.ori_dims[i]
@@ -749,7 +788,7 @@ def main():
     #
     # Layer 2 (hard, inside every policy.rollout() call):
     #   ObstacleProjector in MultiPhaseCertifiedPolicy.rollout() radially
-    #   projects every position point outside the sphere BEFORE the Trace
+    #   projects every position point outside the hard boundary BEFORE the Trace
     #   is built.  This runs unconditionally — hard backstop guarantee.
     #
     # Three-layer obstacle avoidance:
@@ -784,9 +823,18 @@ def main():
     best_cost  = float("inf")
     best_theta = theta_init.copy()
 
+    hard_strength = 0.05
+    hard_infl = 2.5
+    if obs_clause.hard_obstacle is not None:
+        hard_strength = float(obs_clause.hard_obstacle.get("strength", hard_strength))
+        hard_infl = float(obs_clause.hard_obstacle.get("infl_factor", hard_infl))
+
     print(f"\nPIBB: {N_UPDATES} updates x {N_SAMPLES} samples")
     print(f"  K penalty  : ramp [d < {HUMAN_RAMP_RAD} m], hard limit {K_AXIS_LIMIT:.0f} N/m at [d < {HUMAN_PROX_RAD} m]")
-    print(f"  Obs avoid  : DMP repulsion (str=0.05, infl=2.0) + soft cost + hard projector r={OBS_RAD+0.02:.2f} m")
+    print(
+        f"  Obs avoid  : DMP repulsion (str={hard_strength:.3f}, infl={hard_infl:.2f}) "
+        f"+ soft cost + hard projector ({OBSTACLE_GEOMETRY}, r={OBS_RAD:.2f} m)"
+    )
 
     for upd in range(N_UPDATES):
         samples = optimizer.sample(N_SAMPLES)

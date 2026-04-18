@@ -16,7 +16,7 @@ def human_comfort_distance(trace, human_position, preferred_distance):
     return d - preferred_distance
 
 
-def human_body_exclusion(trace, human_position, body_radius):
+def human_body_exclusion(trace, human_position, body_radius, geometry="sphere"):
     """
     Hard exclusion zone — the physical body of the human.
     Robot must NEVER enter this radius. Use with modality=REQUIRE.
@@ -24,7 +24,12 @@ def human_body_exclusion(trace, human_position, body_radius):
     rho < 0  means collision (inside body)
     """
     pos = trace.position
-    d = np.linalg.norm(pos - human_position, axis=1)
+    if geometry == "sphere":
+        d = np.linalg.norm(pos - human_position, axis=1)
+    elif geometry == "cylinder_infinite":
+        d = np.linalg.norm(pos[:, :2] - human_position[:2], axis=1)
+    else:
+        raise ValueError(f"Unsupported human-body geometry: {geometry}")
     return d - body_radius
 
 
@@ -39,14 +44,19 @@ def velocity_limit(trace, vmax):
 #                    Scene-2 predicates                               #
 # ------------------------------------------------------------------ #
 
-def obstacle_avoidance(trace, obstacle_position, safe_radius):
+def obstacle_avoidance(trace, obstacle_position, safe_radius, geometry="sphere"):
     """
     Hard exclusion around a static obstacle.
     rho > 0  →  safe (outside radius)
     rho < 0  →  collision
     """
     pos = trace.position
-    d = np.linalg.norm(pos - obstacle_position, axis=1)
+    if geometry == "sphere":
+        d = np.linalg.norm(pos - obstacle_position, axis=1)
+    elif geometry == "cylinder_infinite":
+        d = np.linalg.norm(pos[:, :2] - obstacle_position[:2], axis=1)
+    else:
+        raise ValueError(f"Unsupported obstacle geometry: {geometry}")
     return d - safe_radius
 
 

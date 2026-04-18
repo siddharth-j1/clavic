@@ -100,6 +100,7 @@
 
     "ObstacleAvoidance.obstacle_position": [0.34644, 0.20459, 0.00000],
     "ObstacleAvoidance.safe_radius": 0.12,
+    "ObstacleAvoidance.geometry": "cylinder_infinite",
 
     "VelocityLimit.vmax": 0.8,
 

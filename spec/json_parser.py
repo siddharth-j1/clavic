@@ -9,6 +9,8 @@ _OBSTACLE_PREDICATES = {
     "HumanBodyExclusion": ("human_position",    "body_radius"),
 }
 
+_SUPPORTED_HARD_GEOMETRIES = {"sphere", "cylinder_infinite"}
+
 def load_taskspec_from_json(path):
 
     with open(path, "r") as f:
@@ -42,16 +44,26 @@ def load_taskspec_from_json(path):
                 center_key, radius_key = _OBSTACLE_PREDICATES[predicate]
                 center = parameters.get(center_key)
                 radius = parameters.get(radius_key)
+                geometry = c.get("hard_geometry", parameters.get("geometry", "sphere"))
+                geometry = str(geometry).strip().lower()
+                if geometry not in _SUPPORTED_HARD_GEOMETRIES:
+                    raise ValueError(
+                        f"Unsupported hard_geometry '{geometry}' for predicate '{predicate}'. "
+                        f"Supported: {sorted(_SUPPORTED_HARD_GEOMETRIES)}"
+                    )
                 if center is not None and radius is not None:
                     center_list = center.tolist() if hasattr(center, "tolist") else list(center)
                     hard_obstacle = {
                         "center":      center_list,
                         "radius":      float(radius),
+                        "geometry":    geometry,
                         "avoidance":   "HARD",
                         "strength":    float(c.get("hard_strength",    0.05)),
                         "infl_factor": float(c.get("hard_infl_factor", 2.5)),
                     }
                     hard_obstacle_specs.append(hard_obstacle)
+                    # Keep the predicate cost geometry consistent with the hard layers.
+                    parameters.setdefault("geometry", geometry)
 
             clause = Clause(
                 operator=operator,

@@ -54,6 +54,7 @@
       "predicate": "HumanBodyExclusion",
       "weight": 20.0,
       "modality": "HARD",
+      "hard_geometry": "cylinder_infinite",
       "hard_strength": 0.2,
       "hard_infl_factor": 3.0,
       "_comment": "Geometric guarantee: DMP repulsion + radial projector"

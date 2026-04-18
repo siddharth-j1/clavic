@@ -10,21 +10,30 @@ The DMP + CGMS framework enforces hard constraints by parameterisation:
   D ≽ αH        by construction (SD slack)
 
 We apply the same philosophy to position constraints.  Instead of a soft
-penalty, we project every waypoint *outside* each obstacle sphere after the
+penalty, we project every waypoint *outside* each obstacle after the
 DMP rollout.  This gives:
 
-    ∀t,  ||p(t) − p_obs|| ≥ r_safe   — hard, by construction
+    sphere:              ||p(t) − c|| >= r_safe
+    infinite cylinder:   ||p_xy(t) − c_xy|| >= r_safe
+
+hard, by construction.
 
 The projection does NOT modify the gain schedule (K, D) or any other part
 of the CGMS structure.  It only displaces position points that fall inside
 an obstacle sphere radially outward to the sphere surface.
 
-Projection formula
-------------------
-Given p inside sphere (c, r):
-  d = ||p − c||
-  p' = c + r * (p − c) / d        if d > ε  (radial push to surface)
-  p' = c + r * e_default           if d ≤ ε  (degenerate: use fixed escape)
+Projection formulas
+-------------------
+Sphere (center c, radius r), for p inside:
+    d = ||p − c||
+    p' = c + r * (p − c) / d         if d > ε
+    p' = c + r * e_default           if d ≤ ε
+
+Infinite cylinder aligned with world Z (axis through c_xy), for p inside:
+    d_xy = ||p_xy − c_xy||
+    p'_xy = c_xy + r * (p_xy − c_xy) / d_xy   if d_xy > ε
+    p'_xy = c_xy + r * e_default_xy           if d_xy ≤ ε
+    p'_z = p_z
 
 where e_default is a unit vector in the XY plane at 45°.
 
@@ -59,30 +68,33 @@ import numpy as np
 
 class ObstacleProjector:
     """
-    Projects a position trajectory outside a list of spherical obstacles.
+    Projects a position trajectory outside a list of obstacles.
 
     Parameters
     ----------
     obstacles : list of dict, each with keys:
         "center" : array-like (3,)   — obstacle centre in world frame
         "radius" : float             — safe clearance radius
+        "geometry" : str (optional)  — "sphere" (default) or
+                                        "cylinder_infinite"
     """
 
     def __init__(self, obstacles=None):
         self.obstacles = []
         if obstacles is not None:
             for obs in obstacles:
-                self.add(obs["center"], obs["radius"])
+                self.add(obs["center"], obs["radius"], obs.get("geometry", "sphere"))
 
-    def add(self, center, radius):
+    def add(self, center, radius, geometry="sphere"):
         self.obstacles.append({
             "center": np.asarray(center, dtype=float),
             "radius": float(radius),
+            "geometry": str(geometry),
         })
 
     def project(self, pos, vel, dt):
         """
-        Project positions outside all obstacle spheres and recompute velocity.
+        Project positions outside all obstacles and recompute velocity.
 
         Parameters
         ----------
@@ -92,7 +104,7 @@ class ObstacleProjector:
 
         Returns
         -------
-        pos_safe : (T, 3)  — projected positions, guaranteed outside all spheres
+        pos_safe : (T, 3)  — projected positions, guaranteed outside all obstacles
         vel_safe : (T, 3)  — finite-difference velocity on projected path
         """
         if not self.obstacles:
@@ -100,28 +112,44 @@ class ObstacleProjector:
 
         pos_safe = pos.copy()
 
-        # Default escape direction (used only in the degenerate case d≈0)
+        # Default escape direction (used only in degenerate case d≈0)
         _e_default = np.array([0.70710678, 0.70710678, 0.0])
 
         for obs in self.obstacles:
             c = obs["center"]
             r = obs["radius"]
+            geometry = obs.get("geometry", "sphere")
 
-            diff = pos_safe - c          # (T, 3)
-            d    = np.linalg.norm(diff, axis=1)   # (T,)
+            if geometry == "sphere":
+                diff = pos_safe - c
+                d = np.linalg.norm(diff, axis=1)
+                inside = d < r
+                if not np.any(inside):
+                    continue
 
-            inside = d < r               # bool (T,)
-            if not np.any(inside):
-                continue
+                for t_idx in np.where(inside)[0]:
+                    dist = d[t_idx]
+                    if dist > 1e-9:
+                        direction = diff[t_idx] / dist
+                    else:
+                        direction = _e_default
+                    pos_safe[t_idx] = c + r * direction
+            elif geometry == "cylinder_infinite":
+                diff_xy = pos_safe[:, :2] - c[:2]
+                d_xy = np.linalg.norm(diff_xy, axis=1)
+                inside = d_xy < r
+                if not np.any(inside):
+                    continue
 
-            for t_idx in np.where(inside)[0]:
-                dist = d[t_idx]
-                if dist > 1e-9:
-                    direction = diff[t_idx] / dist
-                else:
-                    direction = _e_default
-                # Project to sphere surface
-                pos_safe[t_idx] = c + r * direction
+                for t_idx in np.where(inside)[0]:
+                    dist_xy = d_xy[t_idx]
+                    if dist_xy > 1e-9:
+                        dir_xy = diff_xy[t_idx] / dist_xy
+                    else:
+                        dir_xy = _e_default[:2]
+                    pos_safe[t_idx, :2] = c[:2] + r * dir_xy
+            else:
+                raise ValueError(f"Unsupported obstacle geometry: {geometry}")
 
         # Recompute velocity by finite difference on projected path
         T = pos_safe.shape[0]

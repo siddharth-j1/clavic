@@ -171,24 +171,38 @@ class DMPWithGainScheduling:
             # remains active and the path routes AROUND the obstacle.
             # The K=Q^T Q Cholesky ODE runs AFTER this position loop — untouched.
             for obs in self.repulsive_obstacles:
-                diff = y - obs["center"]
-                dist = float(np.linalg.norm(diff))
                 r    = obs["radius"]
                 r_infl = obs["r_infl"]
-                if dist < 1e-9:
-                    # Degenerate: exactly at centre — push in +X+Y direction
-                    net_accel += obs["strength"] * np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0)
-                elif dist < r_infl:
-                    n      = diff / dist                          # outward unit normal
-                    # Smooth cubic taper: alpha=1 at sphere surface (dist=r), 0 at r_infl
-                    # alpha = ((r_infl - dist) / (r_infl - r))^3
-                    # Bounded — no 1/dist^2 singularity.
-                    # Strength is scaled by DMP spring constant so the repulsion is
-                    # commensurable with the attractor force (k = d^2/4 = 100 here).
-                    alpha  = ((r_infl - dist) / (r_infl - r)) ** 3
-                    k_dmp  = (self.d ** 2) / 4.0   # DMP spring constant
-                    mag    = obs["strength"] * k_dmp * alpha
-                    net_accel += mag * n
+                geometry = obs.get("geometry", "sphere")
+
+                if geometry == "sphere":
+                    diff = y - obs["center"]
+                    dist = float(np.linalg.norm(diff))
+                    if dist < 1e-9:
+                        # Degenerate: exactly at centre — push in +X+Y direction
+                        net_accel += obs["strength"] * np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0)
+                    elif dist < r_infl:
+                        n      = diff / dist                          # outward unit normal
+                        # Smooth cubic taper: alpha=1 at surface (dist=r), 0 at r_infl.
+                        alpha  = ((r_infl - dist) / (r_infl - r)) ** 3
+                        k_dmp  = (self.d ** 2) / 4.0   # DMP spring constant
+                        mag    = obs["strength"] * k_dmp * alpha
+                        net_accel += mag * n
+                elif geometry == "cylinder_infinite":
+                    diff_xy = y[:2] - obs["center"][:2]
+                    dist_xy = float(np.linalg.norm(diff_xy))
+                    if dist_xy < 1e-9:
+                        n = np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0)
+                        net_accel += obs["strength"] * n
+                    elif dist_xy < r_infl:
+                        nxy    = diff_xy / dist_xy
+                        n      = np.array([nxy[0], nxy[1], 0.0])
+                        alpha  = ((r_infl - dist_xy) / (r_infl - r)) ** 3
+                        k_dmp  = (self.d ** 2) / 4.0
+                        mag    = obs["strength"] * k_dmp * alpha
+                        net_accel += mag * n
+                else:
+                    raise ValueError(f"Unsupported obstacle geometry: {geometry}")
 
             return net_accel
 

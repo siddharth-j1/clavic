@@ -73,6 +73,7 @@ GOAL = None
 OBSTACLE = None
 OBS_RAD = None
 OBS_SAFE_RAD = None
+OBSTACLE_GEOMETRY = "sphere"
 
 Q_UPRIGHT = None
 OBS_WEIGHT = None
@@ -148,6 +149,13 @@ def smooth_quaternion_signs(q_series):
     return q_cont
 
 
+def _distance_to_obstacle(positions):
+    positions = np.asarray(positions, dtype=float)
+    if OBSTACLE_GEOMETRY == "cylinder_infinite":
+        return np.linalg.norm(positions[:, :2] - OBSTACLE[:2], axis=1)
+    return np.linalg.norm(positions - OBSTACLE, axis=1)
+
+
 # ── diagnostics ───────────────────────────────────────────────────────
 def print_diagnostics(trace, best_cost):
     pos    = trace.position
@@ -162,7 +170,7 @@ def print_diagnostics(trace, best_cost):
     reached = bool(np.any(d_goal < 0.05))
     t_reach = float(trace.time[np.argmax(d_goal < 0.05)]) if reached else -1.0
 
-    d_obs     = np.linalg.norm(pos - OBSTACLE, axis=1)
+    d_obs     = _distance_to_obstacle(pos)
     # Minimum clearance (can be negative — ball inside obstacle zone)
     obs_cm    = (d_obs.min() - OBS_RAD) * 100.0
     # Count how many timesteps are inside obstacle safe radius
@@ -184,7 +192,7 @@ def print_diagnostics(trace, best_cost):
     print(f"  Best cost         : {best_cost:.4f}")
     print(f"  Goal reached      : {'YES' if reached else 'NO'}  t={t_reach:.2f} s")
     print(f"  Max speed         : {speed.max():.4f} m/s  (limit 0.8)")
-    print(f"  Obstacle clearance: {obs_cm:.1f} cm  (PREFER soft — penetration acceptable)")
+    print(f"  Obstacle clearance: {obs_cm:.1f} cm  (PREFER soft {OBSTACLE_GEOMETRY}, penetration acceptable)")
     print(f"  Pts inside obs    : {n_inside}  (PREFER soft: nonzero acceptable)")
     print(f"  Hold pos drift    : {hold_drift*100:.1f} cm  (target < 5)")
     print(f"  tr(K) range       : [{trK.min():.0f}, {trK.max():.0f}] N/m")
@@ -551,7 +559,7 @@ def plot_kinematics(trace, best_cost, base="exp3b_kinematics"):
     vel   = trace.velocity
     t     = trace.time
     speed = np.linalg.norm(vel, axis=1)
-    d_obs = np.linalg.norm(pos - OBSTACLE, axis=1)
+    d_obs = _distance_to_obstacle(pos)
     d_goal= np.linalg.norm(pos - GOAL,     axis=1)
 
     c_x = "#4C72B0"; c_y = "#DD8452"; c_z = "#55A868"; c_spd = "#8172B2"
@@ -667,7 +675,7 @@ def save_trajectory_csv(trace, csv_path="exp3b_trajectory.csv"):
 #  main
 # ======================================================================
 def main():
-    global START, GOAL, OBSTACLE, OBS_RAD, OBS_SAFE_RAD
+    global START, GOAL, OBSTACLE, OBS_RAD, OBS_SAFE_RAD, OBSTACLE_GEOMETRY
     global Q_UPRIGHT, OBS_WEIGHT, T_CARRY_END, T_HOLD_END
     global HUMAN_POS, OBS_HX, OBS_HY
 
@@ -694,6 +702,7 @@ def main():
     OBSTACLE = np.asarray(obs_clause.parameters["obstacle_position"], dtype=float)
     OBS_RAD = float(obs_clause.parameters["safe_radius"])
     OBS_SAFE_RAD = OBS_RAD
+    OBSTACLE_GEOMETRY = str(obs_clause.parameters.get("geometry", "sphere"))
 
     ori_clause = next((c for c in taskspec.clauses
                        if c.predicate == "OrientationLimit"), None)
@@ -713,7 +722,7 @@ def main():
     # repulsion and the radial projector — the soft PREFER cost is the only force.
     policy.set_obstacles([
         {"center": OBSTACLE.tolist(), "radius": OBS_SAFE_RAD,
-         "avoidance": "NONE"},
+            "geometry": OBSTACLE_GEOMETRY, "avoidance": "NONE"},
     ])
 
     theta_dim = policy.parameter_dimension()
@@ -756,7 +765,7 @@ def main():
     best_theta = theta_init.copy()
 
     print(f"\nPIBB: {N_UPDATES} updates x {N_SAMPLES} samples")
-    print(f"  Obstacle: PREFER (soft), weight={OBS_WEIGHT:.2f}, avoidance=NONE")
+    print(f"  Obstacle: PREFER (soft), weight={OBS_WEIGHT:.2f}, geometry={OBSTACLE_GEOMETRY}, avoidance=NONE")
     print(f"  K penalty: ramp [d < {HUMAN_RAMP_RAD} m], limit {K_AXIS_LIMIT:.0f} N/m at [d < {HUMAN_PROX_RAD} m]")
 
     for upd in range(N_UPDATES):
