@@ -4,7 +4,7 @@ main_llm.py — Language-Conditioned Trajectory Synthesis via LLM
 USAGE
 -----
   conda activate clavic
-  export GEMINI_API_KEY="AIza..."   # get free at https://aistudio.google.com/app/apikey
+  export GEMINI_API_KEY=""   # get free at https://aistudio.google.com/app/apikey
   python main_llm.py
 
   # Or pass a task description as a command-line argument:
