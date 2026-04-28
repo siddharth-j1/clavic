@@ -10,7 +10,7 @@
     "  - Hard obstacle avoidance: avoidance='HARD' in set_obstacles()",
     "      \u2192 DMP repulsive forcing (steers ODE organically) + radial projector backstop",
     "      \u2192 GUARANTEED ||p(t)-c|| >= r_safe \u2200t",
-    "  - Constant orientation [1,0,0,0] throughout all 3 phases (no tilt/pour)",
+    "  - Constant orientation [0.50540,-0.49933,0.49576,0.49945] throughout all 3 phases (no tilt/pour)",
     "  - Velocity must reach near-zero at waypoint during hold phase",
     "  - Human proximity stiffness reduction active at final goal",
     "",
@@ -36,16 +36,16 @@
       ],
       "duration": 5.0,
       "start_quat": [
-        1.0,
-        0.0,
-        0.0,
-        0.0
+        0.50540,
+        -0.49933,
+        0.49576,
+        0.49945
       ],
       "end_quat": [
-        1.0,
-        0.0,
-        0.0,
-        0.0
+        0.50540,
+        -0.49933,
+        0.49576,
+        0.49945
       ],
       "n_bfs_ori": 15
     },
@@ -65,16 +65,16 @@
       "n_bfs_traj": 11,
       "n_bfs_slack": 3,
       "start_quat": [
-        1.0,
-        0.0,
-        0.0,
-        0.0
+        0.50540,
+        -0.49933,
+        0.49576,
+        0.49945
       ],
       "end_quat": [
-        1.0,
-        0.0,
-        0.0,
-        0.0
+        0.50540,
+        -0.49933,
+        0.49576,
+        0.49945
       ],
       "n_bfs_ori": 7
     },
@@ -92,16 +92,16 @@
       ],
       "duration": 4.0,
       "start_quat": [
-        1.0,
-        0.0,
-        0.0,
-        0.0
+        0.50540,
+        -0.49933,
+        0.49576,
+        0.49945
       ],
       "end_quat": [
-        1.0,
-        0.0,
-        0.0,
-        0.0
+        0.50540,
+        -0.49933,
+        0.49576,
+        0.49945
       ],
       "n_bfs_ori": 15
     }
@@ -157,7 +157,6 @@
       "weight": 20.0,
       "modality": "HARD",
       "_comment": "Geometric guarantee: DMP repulsion + radial projector",
-      "hard_geometry": "cylinder_infinite",
       "hard_strength": 0.05,
       "hard_infl_factor": 2.0
     },
@@ -216,10 +215,10 @@
     "ObstacleAvoidance.safe_radius": 0.12,
     "VelocityLimit.vmax": 0.8,
     "OrientationLimit.q_ref": [
-      1.0,
-      0.0,
-      0.0,
-      0.0
+      0.50540,
+      -0.49933,
+      0.49576,
+      0.49945
     ],
     "OrientationLimit.max_angle_rad": 0.15,
     "AngularVelocityLimit.omega_max": 1.0

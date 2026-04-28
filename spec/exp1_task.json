@@ -8,8 +8,8 @@
     "  HumanComfortDistance (PREFER, weight=15.0): comfort radius 0.19 m \u2014 soft, high-weight",
     "  Per-axis stiffness reduction via Compiler (ramp from 3xr_comfort down to r_comfort)",
     "Geometry:",
-    "  Start : [0.55, 0.00, 0.30]",
-    "  Goal  : [0.30, 0.55, 0.30]",
+    "  Start : [0.46283, -0.20737, 0.24566]",
+    "  Goal  : [0.32771, 0.82123, 0.24566]",
     "  Human : [0.30, 0.30, 0.30]"
   ],
   "horizon_sec": 10.0,
@@ -17,27 +17,27 @@
     {
       "label": "carry",
       "start": [
-        0.55,
-        0.0,
-        0.3
+        0.46283,
+        -0.20737,
+        0.24566
       ],
       "end": [
-        0.3,
-        0.55,
-        0.3
+        0.32771,
+        0.82123,
+        0.24566
       ],
       "duration": 10.0,
       "start_quat": [
-        1.0,
-        0.0,
-        0.0,
-        0.0
+        0.50540,
+        -0.49933,
+        0.49576,
+        0.49945
       ],
       "end_quat": [
-        1.0,
-        0.0,
-        0.0,
-        0.0
+        0.50540,
+        -0.49933,
+        0.49576,
+        0.49945
       ],
       "n_bfs_ori": 15
     }
@@ -54,7 +54,6 @@
       "predicate": "HumanBodyExclusion",
       "weight": 20.0,
       "modality": "HARD",
-      "hard_geometry": "cylinder_infinite",
       "hard_strength": 0.2,
       "hard_infl_factor": 3.0,
       "_comment": "Geometric guarantee: DMP repulsion + radial projector"
@@ -87,9 +86,9 @@
   ],
   "bindings": {
     "AtGoal.waypoint": [
-      0.3,
-      0.55,
-      0.3
+      0.32771,
+      0.82123,
+      0.24566
     ],
     "AtGoal.tolerance": 0.05,
     "HumanBodyExclusion.human_position": [
@@ -106,10 +105,10 @@
     "HumanComfortDistance.preferred_distance": 0.19,
     "VelocityLimit.vmax": 0.8,
     "OrientationLimit.q_ref": [
-      1.0,
-      0.0,
-      0.0,
-      0.0
+      0.50540,
+      -0.49933,
+      0.49576,
+      0.49945
     ],
     "OrientationLimit.max_angle_rad": 0.15,
     "AngularVelocityLimit.omega_max": 1.0

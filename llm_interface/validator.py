@@ -21,6 +21,18 @@ VALID_OPERATORS = {
 VALID_MODALITIES = {"HARD", "REQUIRE", "PREFER"}
 
 
+def _is_valid_shape_points(value) -> bool:
+    """Return True if value is a list-like of N points with 3 numeric coords each."""
+    if not isinstance(value, list) or len(value) < 1:
+        return False
+    for pt in value:
+        if not isinstance(pt, list) or len(pt) != 3:
+            return False
+        if not all(isinstance(v, (int, float)) for v in pt):
+            return False
+    return True
+
+
 # ─────────────────────────────────────────────────────────────────────────── #
 #  Public entry point
 # ─────────────────────────────────────────────────────────────────────────── #
@@ -61,6 +73,37 @@ def validate_and_clamp(spec_dict: dict) -> tuple[dict, list[str], list[str]]:
         return spec, errors, warnings
 
     bindings = spec["bindings"]
+
+    # Geometry is now deterministic from modality in json_parser:
+    #   HARD -> cylinder_infinite, REQUIRE/PREFER -> sphere.
+    # Remove geometry overrides from LLM/user JSON for consistency.
+    for idx, clause in enumerate(spec["clauses"]):
+        if "hard_geometry" in clause:
+            warnings.append(
+                f"clause[{idx}]: 'hard_geometry' ignored (geometry is derived from modality)."
+            )
+            clause.pop("hard_geometry", None)
+
+    geom_keys = [k for k in bindings.keys() if k.endswith(".geometry")]
+    for key in geom_keys:
+        warnings.append(
+            f"binding '{key}' ignored (geometry is derived from modality)."
+        )
+        bindings.pop(key, None)
+
+    # Validate generic optional shape bindings used by json_parser.
+    for key, val in list(bindings.items()):
+        if key.endswith(".shape_points") and not _is_valid_shape_points(val):
+            errors.append(
+                f"binding '{key}' must be [[x,y,z], ...] with numeric coordinates."
+            )
+        if key.endswith(".shape_margin") and isinstance(val, (int, float)):
+            if val < 0.0 or val > 1.0:
+                clamped = max(0.0, min(1.0, float(val)))
+                warnings.append(
+                    f"binding '{key}'={val} out of range [0.0,1.0] -> clamped to {clamped}."
+                )
+                bindings[key] = clamped
 
     # Per-clause validation
     for idx, clause in enumerate(spec["clauses"]):

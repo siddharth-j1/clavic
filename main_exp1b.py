@@ -11,10 +11,8 @@ Demonstrates HARD vs SOFT constraint behaviour under time pressure:
 Compare with Exp 1 (T=10 s, weight=15): trajectory stays fully outside.
 Here (T=2 s, weight=4): trajectory cuts through comfort zone — body still safe.
 
-Geometry (same as Scene 5):
-  Start  : [0.55, 0.00, 0.30]
-  Goal   : [0.30, 0.55, 0.30]
-  Human  : [0.30, 0.30, 0.30]
+Geometry:
+    Start, goal, and human positions are loaded from spec/exp1b_task.json
 
 Outputs (prefix scene5b_):
   scene5b_workspace.png / scene5b_topdown.png

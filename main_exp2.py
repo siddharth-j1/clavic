@@ -13,15 +13,9 @@ Key features vs Scene 3:
       → DMP repulsive forcing (steers ODE organically around obstacle)
       → hard radial projector post-rollout (backstop guarantee)
       → GUARANTEED  ||p(t) − c|| ≥ r_safe  ∀t
-  - Constant orientation [1,0,0,0] throughout ALL 3 phases (no tilt, no pour)
+    - Constant orientation from spec/exp2_task.json throughout all 3 phases (no tilt, no pour)
   - No human proximity stiffness penalty — goal is a delivery point, not a person
-  - Same geometry as Scene 3/3b: start, goal, obstacle positions identical
-
-Geometry:
-    Start     : [0.46283, -0.20737, 0.24566]
-    Waypoint  : [0.66840, 0.33978, 0.21647]  — hold here for 2 s
-    Goal      : [0.32771, 0.82123, 0.24566]
-    Obstacle  : [0.34532, 0.20459, 0.00000]
+    - Geometry is loaded from spec/exp2_task.json (start, waypoint, goal, obstacle)
 
 Plots (PNG only, 300 dpi):
   1. scene4_workspace.png   — 3D Franka FRS view

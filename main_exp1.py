@@ -15,9 +15,7 @@ Per-axis stiffness reduction:
   with ramp starting at 3 × comfort radius.
 
 Geometry:
-  Start  : [0.55, 0.00, 0.30]
-  Goal   : [0.30, 0.55, 0.30]  — delivery drop-off (not a person)
-  Human  : [0.30, 0.30, 0.30]
+    Start, goal, and human positions are loaded from spec/exp1_task.json
 
 Plots (PNG, 300 dpi):
   1. scene5_workspace.png   — 3D view

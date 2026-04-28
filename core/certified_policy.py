@@ -33,7 +33,7 @@ class CertifiedPolicy:
 
         # ---- Same hyperparameters as CGMS ----
         self.TAU = tau
-        self.DT = 0.01
+        self.DT = 0.001
         self.ALPHA = 0.05
         self.K0 = 200.0
         self.D0 = 30.0

@@ -3,10 +3,9 @@ Exp 3a: Carry-then-Pour with Human-Proximity Per-Axis Stiffness Reduction.
 
 2-phase task (no separate hold):
   Phase 1 (0-7 s) : carry mug upright from start to goal, avoid obstacle
-  Phase 2 (7-10 s): pour -- tilt 90 deg about Y axis, hold position at goal
-            fontweight="bold", color=C_GOAL)
-
-    # obstacle labelch K_ii < 100 N/m when arm is near human (goal).
+    Phase 2 (7-10 s): pour -- tilt 90 deg about Y axis, hold position at goal
+    Geometry and orientations are loaded from spec/exp3a_task.json
+    Stiffness reduction near the human is handled by the compiler penalty
 CGMS guarantee K = Q^T Q > 0 is maintained throughout.
 
 3 publication-quality plots (PDF + PNG, 300 dpi):

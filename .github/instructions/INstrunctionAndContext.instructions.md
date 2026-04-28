@@ -7,7 +7,7 @@ Instructions for you to follow :
    activate this env.
 3. don not run any process in background run in termianl with full Output
    so i can also see that what is going on.  
-4. Make plots in clean way that can submitted in pretegious conference, use seaborn and matplotlib to make plots. Use seaborn style and color palette to make plots look good. Use appropriate labels, legends, titles, and axis limits to make plots clear and informative. Save plots in high resolution (300 dpi) and in vector format (pdf or svg) for publication quality. Also make legend not overlapwith plots.
+4. Make plots in clean way that can submitted in pretegious conference, use seaborn and matplotlib to make plots. Use seaborn style and color palette to make plots look good. Use appropriate labels, legends, titles, and axis limits to make plots clear and informative. Save plots in high resolution (300 dpi) and in vector format (pdf or svg) for publication quality. Also make legend not overlapwith plots. also dont overlap legend box over plot, you can keep in side so plots are clear.
 5. dont create unnecessary .md or markdown or text files untill you were told to do so.
 6. dont run for large iteration as most cases getting saturated in 60-70 eppoch , not a good idea to wastre time if cost going down we can later increase no of updates for better results.
 7. Dont create unnecessary preciated like defining whole specific case prefer to use prev       
